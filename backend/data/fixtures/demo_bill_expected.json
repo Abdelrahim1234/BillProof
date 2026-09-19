@@ -1,0 +1,51 @@
+{
+  "_notice": "Synthetic fixture for tests and the demo endpoint. Not a real bill.",
+  "hospital_name": "LewisGale Hospital Montgomery",
+  "coverage_type": "commercial",
+  "payer_name": "Cigna",
+  "plan_name": "NPR",
+  "service_month": "2026-09",
+  "lines": [
+    {
+      "code": "71046",
+      "code_type": "CPT",
+      "description": "Chest X-ray, 2 views",
+      "care_setting": "outpatient",
+      "charge_scope": "unknown",
+      "units": "1",
+      "billed_amount": "450.00",
+      "allowed_amount": "450.00",
+      "expected_comparison_status": "compared",
+      "expected_confidence": "high",
+      "expected_match_tier": "same_hospital_exact_code_setting_payer_plan",
+      "expected_review_score": 75,
+      "expected_review_label": "high_review_opportunity"
+    },
+    {
+      "code": "80053",
+      "code_type": "CPT",
+      "description": "Comprehensive metabolic panel",
+      "care_setting": "outpatient",
+      "charge_scope": "unknown",
+      "units": "1",
+      "billed_amount": "210.00",
+      "patient_responsibility": "150.00",
+      "expected_comparison_status": "compared",
+      "expected_review_score": null,
+      "expected_reason": "insured line with no allowed amount and no compatible payer/plan match -> contextual rates only"
+    },
+    {
+      "code": "27447",
+      "code_type": "CPT",
+      "description": "Total knee arthroplasty",
+      "care_setting": "outpatient",
+      "charge_scope": "unknown",
+      "units": "1",
+      "billed_amount": "28500.00",
+      "allowed_amount": "22000.00",
+      "expected_comparison_status": "insufficient_data",
+      "expected_reason": "no price_records for this code at this hospital or any peer"
+    }
+  ],
+  "expected_overall_status": "partial"
+}

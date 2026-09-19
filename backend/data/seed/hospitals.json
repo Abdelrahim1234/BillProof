@@ -1,0 +1,42 @@
+[
+  {
+    "name": "LewisGale Hospital Montgomery",
+    "organization_npi": "1275570376",
+    "facility_type": "hospital",
+    "address": "3700 S Main St",
+    "city": "Blacksburg",
+    "state": "VA",
+    "zip_code": "24060",
+    "hospital_type": "Acute Care Hospitals",
+    "ownership": "Proprietary",
+    "phone": "540-951-1111",
+    "latitude": 37.2001,
+    "longitude": -80.4181,
+    "financial_assistance_url": "https://lewisgalemontgomery.com/patients-visitors/billing-insurance/financial-assistance/",
+    "billing_url": "https://lewisgalemontgomery.com/patients-visitors/billing-insurance/",
+    "public_price_url": "https://www.hcavirginia.com/patient-resources/patient-financial-resources/pricing-transparency-cms-required-file-of-standard-charges",
+    "verification_source": "https://www.hcavirginia.com/cms-hpt.txt",
+    "verification_date": "2026-09-19",
+    "_note": "Hospital identity and MRF source were checked against HCA Virginia's official facility and CMS price-transparency pages."
+  },
+  {
+    "name": "Carilion New River Valley Medical Center",
+    "organization_npi": "1376536573",
+    "facility_type": "hospital",
+    "address": "2900 Lamb Cir",
+    "city": "Christiansburg",
+    "state": "VA",
+    "zip_code": "24073",
+    "hospital_type": "Acute Care Hospitals",
+    "ownership": "Non-Profit",
+    "phone": "540-731-2000",
+    "latitude": 37.1259,
+    "longitude": -80.4292,
+    "financial_assistance_url": "https://www.carilionclinic.org/billing/financial-assistance",
+    "billing_url": "https://www.carilionclinic.org/billing",
+    "public_price_url": "https://www.carilionclinic.org/pricing",
+    "verification_source": "https://www.carilionclinic.org/cms-hpt.txt",
+    "verification_date": "2026-09-19",
+    "_note": "Hospital identity and MRF source were checked against Carilion's official CMS price-transparency files."
+  }
+]

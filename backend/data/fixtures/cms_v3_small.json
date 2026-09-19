@@ -1,0 +1,144 @@
+{
+  "hospital_name": "LewisGale Hospital Montgomery",
+  "last_updated_on": "2026-01-15",
+  "schema_version": "2.2.0",
+  "_synthetic_notice": "Generated fixture for BillProof P0 demo. Not a real hospital MRF. Every row from this file is stored with is_synthetic=true.",
+  "standard_charge_information": [
+    {
+      "description": "Chest X-ray, 2 views",
+      "code_information": [{"code": "71046", "type": "CPT"}],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "gross_charge": 450.00,
+          "discounted_cash": 120.00,
+          "deidentified_minimum": 95.00,
+          "deidentified_maximum": 310.00,
+          "allowed_amounts": {"p10": 105.00, "median": 140.00, "p90": 210.00, "count": 42},
+          "payers_information": [
+            {"payer_name": "Cigna", "plan_name": "Cigna PPO", "standard_charge_dollar": 155.00, "billing_class": "facility"}
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Comprehensive metabolic panel",
+      "code_information": [{"code": "80053", "type": "CPT"}],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "gross_charge": 210.00,
+          "discounted_cash": 45.00,
+          "deidentified_minimum": 30.00,
+          "deidentified_maximum": 120.00,
+          "allowed_amounts": {"p10": 38.00, "median": 52.00, "p90": 88.00, "count": 61},
+          "payers_information": [
+            {"payer_name": "Cigna", "plan_name": "Cigna PPO", "standard_charge_dollar": 58.00, "billing_class": "facility"}
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Complete blood count with differential",
+      "code_information": [{"code": "85025", "type": "CPT"}],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "gross_charge": 130.00,
+          "discounted_cash": 28.00,
+          "deidentified_minimum": 18.00,
+          "deidentified_maximum": 70.00,
+          "allowed_amounts": {"p10": 22.00, "median": 31.00, "p90": 52.00, "count": 74},
+          "payers_information": [
+            {"payer_name": "Cigna", "plan_name": "Cigna PPO", "standard_charge_dollar": 33.00, "billing_class": "facility"}
+          ]
+        }
+      ]
+    },
+    {
+      "description": "CT abdomen and pelvis with contrast",
+      "code_information": [{"code": "74177", "type": "CPT"}],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "gross_charge": 4200.00,
+          "discounted_cash": 980.00,
+          "deidentified_minimum": 700.00,
+          "deidentified_maximum": 2600.00,
+          "allowed_amounts": {"p10": 820.00, "median": 1150.00, "p90": 1900.00, "count": 27},
+          "payers_information": [
+            {"payer_name": "Cigna", "plan_name": "Cigna PPO", "standard_charge_dollar": 1240.00, "billing_class": "facility"}
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Emergency department visit, level 4",
+      "code_information": [{"code": "99284", "type": "HCPCS"}],
+      "standard_charges": [
+        {
+          "setting": "emergency",
+          "gross_charge": 2600.00,
+          "discounted_cash": 780.00,
+          "deidentified_minimum": 520.00,
+          "deidentified_maximum": 1900.00,
+          "allowed_amounts": {"p10": 610.00, "median": 890.00, "p90": 1450.00, "count": 55},
+          "payers_information": [
+            {"payer_name": "Cigna", "plan_name": "Cigna PPO", "standard_charge_dollar": 950.00, "billing_class": "facility"}
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Emergency department visit, level 5",
+      "code_information": [{"code": "99285", "type": "HCPCS"}],
+      "standard_charges": [
+        {
+          "setting": "emergency",
+          "gross_charge": 4100.00,
+          "discounted_cash": 1350.00,
+          "deidentified_minimum": 900.00,
+          "deidentified_maximum": 3200.00,
+          "allowed_amounts": {"p10": 1050.00, "median": 1520.00, "p90": 2400.00, "count": 33},
+          "payers_information": [
+            {"payer_name": "Cigna", "plan_name": "Cigna PPO", "standard_charge_dollar": 1610.00, "billing_class": "facility"}
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Electrocardiogram, complete",
+      "code_information": [{"code": "93000", "type": "CPT"}],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "gross_charge": 190.00,
+          "discounted_cash": 40.00,
+          "deidentified_minimum": 25.00,
+          "deidentified_maximum": 95.00,
+          "allowed_amounts": {"p10": 30.00, "median": 44.00, "p90": 70.00, "count": 48},
+          "payers_information": [
+            {"payer_name": "Cigna", "plan_name": "Cigna PPO", "standard_charge_dollar": 47.00, "billing_class": "facility"}
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Routine blood draw (venipuncture)",
+      "code_information": [{"code": "36415", "type": "CPT"}],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "gross_charge": 45.00,
+          "discounted_cash": 12.00,
+          "deidentified_minimum": 7.00,
+          "deidentified_maximum": 28.00,
+          "allowed_amounts": {"p10": 9.00, "median": 13.00, "p90": 20.00, "count": 90},
+          "payers_information": [
+            {"payer_name": "Cigna", "plan_name": "Cigna PPO", "standard_charge_dollar": 14.00, "billing_class": "facility"}
+          ]
+        }
+      ]
+    }
+  ]
+}

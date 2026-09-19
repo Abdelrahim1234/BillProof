@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+*.db
+.pytest_cache/
+.ruff_cache/
+uploads_tmp/
+dist/
+*.egg-info/
+data/seed/ingest_history.json
+
+# Never commit full hospital machine-readable files. Keep only curated extracts.
+data/raw/
+data/downloads/
+data/**/*_standardcharges.csv
+data/**/*_standardcharges.json

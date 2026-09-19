@@ -1,0 +1,7 @@
+# Bundled cross-agent skill mirrors. Claude's own skill directory remains available.
+.agents/skills/
+.aider-desk/skills/
+.augment/skills/
+.autohand/skills/
+.bob/skills/
+data/skills/

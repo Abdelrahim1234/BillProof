@@ -1,0 +1,69 @@
+# Bill review packet -- {{ hospital_name }}
+
+## Summary
+{{ packet.summary }}
+{% if packet.bill_notice %}
+> {{ packet.bill_notice }}
+{% endif %}
+{% if packet.additional_context %}
+{{ packet.additional_context }}
+{% endif %}
+
+## Assumptions and missing information
+{% for a in packet.assumptions %}
+- {{ a }}
+{% endfor %}
+{% if packet.missing_fields %}
+Missing: {{ packet.missing_fields | join(", ") }}
+{% endif %}
+
+## Line-item comparison
+| Code | Description | Compared amount | Public benchmark | Difference | Review |
+|---|---|---|---|---|---|
+{% for li in packet.line_items %}
+| {{ li.code or "--" }} | {{ li.description or "--" }} | {{ li.comparison_amount_text or "--" }} ({{ li.comparison_amount_label }}) | {{ li.benchmark_amount_text or "n/a" }}{% if li.benchmark_label %} ({{ li.benchmark_label }}){% endif %} | {{ li.difference_text or "n/a" }} | {{ li.review_label or li.comparison_status }} |
+{% endfor %}
+
+Benchmark limitations:
+{% for li in packet.line_items %}
+{% for lim in li.limitations %}
+- ({{ li.code or "line" }}) {{ lim }}
+{% endfor %}
+{% endfor %}
+{% for lim in packet.source_limitations %}
+- (source: {{ lim.source_name }}) {{ lim.text }}
+{% endfor %}
+
+## Questions for billing/coding review
+{% for q in packet.review_questions %}
+- {{ q }}
+{% endfor %}
+
+## Itemized-bill checklist
+{% for c in packet.itemized_bill_checklist %}
+- [ ] {{ c }}
+{% endfor %}
+
+{% if packet.eob_reconciliation_checklist %}
+## Insurer EOB reconciliation checklist
+{% for c in packet.eob_reconciliation_checklist %}
+- [ ] {{ c }}
+{% endfor %}
+{% endif %}
+
+## Phone script
+{{ packet.phone_script }}
+
+## Written review request
+{{ packet.written_request }}
+
+Patient name: {{ packet.placeholders.patient_name }}
+Account number: {{ packet.placeholders.account_number }}
+
+## Sources
+{% for s in packet.benchmark_sources %}
+- {{ s.publisher }}{% if s.is_synthetic %} (synthetic fixture, not a real hospital price){% endif %} -- {{ s.source_url }} (MRF last updated {{ s.effective_date or "unknown" }}, retrieved {{ s.retrieval_date }}){% if s.source_record_locator %}; record {{ s.source_record_locator }}{% endif %}{{ "\n" }}
+{% endfor %}
+
+---
+{{ packet.disclaimer }}

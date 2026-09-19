@@ -1,0 +1,50 @@
+[
+  {
+    "name": "NRV Urgent Care - Blacksburg",
+    "facility_type": "urgent_care",
+    "address": "2951 N Franklin St",
+    "city": "Blacksburg",
+    "state": "VA",
+    "zip_code": "24060",
+    "phone": "540-552-1000",
+    "latitude": 37.2456,
+    "longitude": -80.4139,
+    "public_price_url": null,
+    "verification_source": null,
+    "verification_date": null,
+    "_note": "NPPES-style candidate, unverified. No public price is seeded until the docs/99 verification task is complete.",
+    "has_prices": false
+  },
+  {
+    "name": "Priority Care Christiansburg",
+    "facility_type": "urgent_care",
+    "address": "2635 Roanoke St",
+    "city": "Christiansburg",
+    "state": "VA",
+    "zip_code": "24073",
+    "phone": "540-381-6000",
+    "latitude": 37.1305,
+    "longitude": -80.3987,
+    "public_price_url": null,
+    "verification_source": null,
+    "verification_date": null,
+    "_note": "NPPES-style candidate, unverified. No public price is seeded until the docs/99 verification task is complete.",
+    "has_prices": false
+  },
+  {
+    "name": "Family Urgent Care of Montgomery County",
+    "facility_type": "urgent_care",
+    "address": "1500 Tyler Rd",
+    "city": "Blacksburg",
+    "state": "VA",
+    "zip_code": "24060",
+    "phone": "540-552-2000",
+    "latitude": 37.2298,
+    "longitude": -80.4302,
+    "public_price_url": null,
+    "verification_source": null,
+    "verification_date": null,
+    "_note": "Deliberately kept with no public price on file -- the honest 'unavailable' state is part of the product (docs/05), not a gap. Unverified NPPES-style candidate.",
+    "has_prices": false
+  }
+]

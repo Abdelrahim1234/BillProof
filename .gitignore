@@ -1,0 +1,25 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite
+*.sqlite3
+.pytest_cache/
+.ruff_cache/
+uploads_tmp/
+
+# Local agent/tooling state and generated graph output.
+/.agents/
+/.aider-desk/
+/.augment/
+/.autohand/
+/.bob/
+/.claude/
+/data/skills/
+/graphify-out/
+/skills-lock.json
+/BillProof/

@@ -1,0 +1,32 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./billproof.db}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      DEMO_MODE: ${DEMO_MODE:-true}
+    volumes:
+      - billproof_sqlite:/app
+    command: >
+      sh -c "uv run python scripts/seed.py &&
+             uv run uvicorn billproof.api.main:app --host 0.0.0.0 --port 8000"
+
+  # Optional: `docker compose --profile postgres up` to run against Postgres
+  # instead of SQLite. Only DATABASE_URL needs to change on the api service.
+  db:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: billproof
+      POSTGRES_PASSWORD: billproof
+      POSTGRES_DB: billproof
+    ports:
+      - "5432:5432"
+    volumes:
+      - billproof_pg:/var/lib/postgresql/data
+
+volumes:
+  billproof_sqlite:
+  billproof_pg:

@@ -1,0 +1,28 @@
+SYNTHETIC DEMO BILL -- not a real patient statement
+LewisGale Hospital Montgomery
+Insurance: Cigna / NPR
+Service date: 2026-09-03
+
+Line 1
+Code: 71046 (CPT)
+Description: Chest X-ray, 2 views
+Setting: Outpatient
+Units: 1
+Billed amount: $450.00
+Allowed amount: $450.00
+
+Line 2
+Code: 80053 (CPT)
+Description: Comprehensive metabolic panel
+Setting: Outpatient
+Units: 1
+Billed amount: $210.00
+Patient responsibility: $150.00
+
+Line 3
+Code: 27447 (CPT)
+Description: Total knee arthroplasty
+Setting: Outpatient
+Units: 1
+Billed amount: $28500.00
+Allowed amount: $22000.00

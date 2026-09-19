@@ -1,0 +1,10 @@
+[
+  {"code": "71046", "code_type": "CPT", "service_key": "chest_xray_2_view", "display_name": "Chest X-ray, 2 views", "setting": "outpatient"},
+  {"code": "80053", "code_type": "CPT", "service_key": "comprehensive_metabolic_panel", "display_name": "Comprehensive metabolic panel", "setting": "outpatient"},
+  {"code": "85025", "code_type": "CPT", "service_key": "cbc_with_differential", "display_name": "Complete blood count with differential", "setting": "outpatient"},
+  {"code": "74177", "code_type": "CPT", "service_key": "ct_abdomen_pelvis_contrast", "display_name": "CT abdomen and pelvis with contrast", "setting": "outpatient"},
+  {"code": "99284", "code_type": "CPT", "service_key": "er_visit_level_4", "display_name": "Emergency department visit, level 4", "setting": "outpatient"},
+  {"code": "99285", "code_type": "CPT", "service_key": "er_visit_level_5", "display_name": "Emergency department visit, level 5", "setting": "outpatient"},
+  {"code": "93000", "code_type": "CPT", "service_key": "ekg_complete", "display_name": "Electrocardiogram, complete", "setting": "outpatient"},
+  {"code": "36415", "code_type": "CPT", "service_key": "venipuncture", "display_name": "Routine blood draw (venipuncture)", "setting": "outpatient"}
+]

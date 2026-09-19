@@ -1,0 +1,43 @@
+[
+  {
+    "source_id": "lewisgale_montgomery_2026_09_01",
+    "hospital_name": "LewisGale Hospital Montgomery",
+    "source_type": "cms_mrf_verified_extract",
+    "discovery_url": "https://www.hcavirginia.com/cms-hpt.txt",
+    "source_page_url": "https://www.hcavirginia.com/patient-resources/patient-financial-resources/pricing-transparency-cms-required-file-of-standard-charges",
+    "source_url": "https://stctrprodsnsvc00455826e6.blob.core.windows.net/pt-final-posting-files/54-0889154_LEWISGALE-HOSPITAL-MONTGOMERY_standardcharges.json?si=dpx-pt-json-access-policy&spr=https&sv=2026-02-06&sr=c&sig=ks%2BgfAjyEHlZmeP2PYJ%2f9NpMuCoRStjTb2bhIy9Y6LM%3D",
+    "file_date": "2026-09-01",
+    "retrieved_at": "2026-09-19T06:46:12Z",
+    "schema_version": "3.0.0",
+    "file_size_bytes": 325667881,
+    "sha256": "a275b2d66ad697bebf47391c1130a1c123cadf2b49ec8e5696de919c9155767c",
+    "location_names": [
+      "LEWISGALE HOSPITAL MONTGOMERY",
+      "CHRISTIANSBURG FSER"
+    ],
+    "limitations": [
+      "The MRF jointly lists LewisGale Hospital Montgomery and Christiansburg FSER.",
+      "Most rows do not identify which listed location they apply to.",
+      "The selected rows do not publish billing class or service units; those fields remain unknown."
+    ]
+  },
+  {
+    "source_id": "carilion_nrv_2025_12_15",
+    "hospital_name": "Carilion New River Valley Medical Center",
+    "source_type": "cms_mrf_verified_extract",
+    "discovery_url": "https://www.carilionclinic.org/cms-hpt.txt",
+    "source_page_url": "https://www.carilionclinic.org/pricing",
+    "source_url": "https://www.carilionclinic.org/540553805_carilion-new-river-valley-medical-center_standardcharges.csv",
+    "file_date": "2025-12-15",
+    "retrieved_at": "2026-09-19T06:42:56Z",
+    "schema_version": "3.0.0",
+    "file_size_bytes": 55972998,
+    "sha256": "48f6c44e51424a14cf3418eb54bc1e4aacce3f7bd3c7db78e73a9adf34981e3d",
+    "location_names": [
+      "Carilion New River Valley Medical Center"
+    ],
+    "limitations": [
+      "The selected rows do not publish billing class or service units; those fields remain unknown."
+    ]
+  }
+]

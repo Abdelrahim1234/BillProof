@@ -37,6 +37,10 @@ async def assign_request_id(request: Request, call_next):
     set_request_id(uuid.uuid4().hex)
     response = await call_next(request)
     response.headers["X-Request-Id"] = get_request_id()
+    # Every response here is per-case or live state. A CDN in front of this API
+    # (Vercel's, in the hosted setup) will otherwise serve a stale bill to the
+    # presentation screen, or replay a bill that was just cleared.
+    response.headers["Cache-Control"] = "no-store"
     return response
 
 
@@ -66,6 +70,7 @@ from billproof.api.routes import (
     health,
     hospitals,
     packets,
+    screens,
 )
 from billproof.api.routes import (
     map as map_routes,
@@ -79,3 +84,4 @@ app.include_router(analysis.router)
 app.include_router(activity.router)
 app.include_router(packets.router)
 app.include_router(map_routes.router)
+app.include_router(screens.router)

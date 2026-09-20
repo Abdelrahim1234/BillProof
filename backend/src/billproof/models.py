@@ -300,3 +300,23 @@ class FacilityAssistance(Base):
     summary: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     source_url: Mapped[str] = mapped_column(String(500))
     last_verified_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class ScreenSubmission(Base):
+    """One bill sent to a presentation screen (docs/04 demo surface).
+
+    This is a *display copy*, not a second source of truth: it holds the
+    already-computed analysis plus the line labels needed to render it, and
+    never a case access token. Publishing replaces whatever the room held, so
+    only the bill currently on screen is retained.
+    """
+
+    __tablename__ = "screen_submissions"
+    __table_args__ = (Index("ix_screen_submissions_room", "room_code", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    room_code: Mapped[str] = mapped_column(String(32))
+    case_id: Mapped[str] = mapped_column(String(36))
+    source_label: Mapped[str] = mapped_column(String(50))
+    payload_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

@@ -7,6 +7,9 @@ from billproof.schemas.common import Money, SourceCitation
 
 class PriceReference(BaseModel):
     price_record_id: str
+    code: str
+    code_type: str
+    description: str | None = None
     charge_type: str
     amount: Money | None
     payer_name: str | None = None

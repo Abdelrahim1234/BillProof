@@ -38,6 +38,9 @@ def mask_identity_fields(text: str) -> str:
 def price_reference(record: PriceRecord) -> PriceReference:
     return PriceReference(
         price_record_id=record.id,
+        code=record.code,
+        code_type=record.code_type,
+        description=record.description,
         charge_type=record.charge_type,
         amount=Money.from_decimal(record.amount),
         payer_name=record.payer_name,

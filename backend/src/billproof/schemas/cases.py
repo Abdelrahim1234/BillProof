@@ -36,5 +36,6 @@ class CaseOut(BaseModel):
     care_setting: str
     service_month: str | None
     language: str
+    external_processing_consent: bool
     created_at: datetime
     expires_at: datetime

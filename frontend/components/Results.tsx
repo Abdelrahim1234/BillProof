@@ -3,6 +3,7 @@
 import type { Analysis, BillLineOut, Facility, LineComparison, SourceCitation } from "@/lib/api";
 import { formatMoney } from "@/lib/api";
 import { PairedBars } from "@/components/Bars";
+import AskAI from "@/components/AskAI";
 import {
   BASIS_LABELS,
   CONFIDENCE_LABELS,
@@ -27,7 +28,7 @@ function SourceList({ sources }: { sources: SourceCitation[] }) {
             <br />
             File dated {s.effective_date ?? "unknown"}, retrieved {s.retrieval_date}.{" "}
             <a href={s.source_url} target="_blank" rel="noreferrer">
-              Open the source file
+              Open hospital source page
             </a>
             {s.source_record_locator && (
               <>
@@ -49,11 +50,14 @@ export function LineCard({
   line,
   comparison,
   scale,
+  ask,
 }: {
   line: DisplayLine | undefined;
   comparison: LineComparison;
   /** Shared axis maximum. When given, the two amounts are drawn as bars. */
   scale?: number;
+  /** Present only when the case has consented to AI-assisted explanations. */
+  ask?: { caseId: string };
 }) {
   const title = line?.description || (line?.code ? `Code ${line.code}` : "Bill line");
   const showCodeSuffix = Boolean(line?.code && line?.description);
@@ -61,7 +65,7 @@ export function LineCard({
   const benchmark = comparison.benchmark;
   const review = comparison.review_label ? REVIEW_LABELS[comparison.review_label] : null;
   const basis = benchmark ? BASIS_LABELS[benchmark.basis] : null;
-  const contextOnly = comparison.comparison_status === "compared" && comparison.review_score === null;
+  const contextOnly = comparison.comparison_status === "context_only";
   const diffCents = comparison.difference?.amount_cents ?? null;
 
   return (
@@ -155,7 +159,7 @@ export function LineCard({
       )}
 
       {(comparison.warnings.length > 0 || (benchmark?.limitations.length ?? 0) > 0) &&
-        comparison.comparison_status === "compared" && (
+        comparison.comparison_status !== "insufficient_data" && (
           <details>
             <summary>Limits on this comparison</summary>
             <ul className="tight small">
@@ -178,6 +182,8 @@ export function LineCard({
       )}
 
       <SourceList sources={comparison.references} />
+
+      {ask && <AskAI caseId={ask.caseId} lineId={comparison.line_id} />}
     </article>
   );
 }
@@ -191,6 +197,7 @@ export default function Results({
   onDelete,
   onRestart,
   busy,
+  ask,
 }: {
   analysis: Analysis;
   lines: BillLineOut[];
@@ -200,6 +207,8 @@ export default function Results({
   onDelete: () => void;
   onRestart: () => void;
   busy: boolean;
+  /** Present only when the case has consented to AI-assisted explanations. */
+  ask?: { caseId: string };
 }) {
   const byId = new Map(lines.map((l) => [l.id, l]));
   const scored = analysis.line_comparisons.filter((c) => c.review_score !== null).length;
@@ -234,8 +243,10 @@ export default function Results({
 
       {analysis.status === "insufficient_data" && <p className="note">{NO_COMPARISON_POSTURE}</p>}
 
+      {ask && <AskAI caseId={ask.caseId} />}
+
       {analysis.line_comparisons.map((c) => (
-        <LineCard key={c.line_id} line={byId.get(c.line_id)} comparison={c} />
+        <LineCard key={c.line_id} line={byId.get(c.line_id)} comparison={c} ask={ask} />
       ))}
 
       {findings.size > 0 && (

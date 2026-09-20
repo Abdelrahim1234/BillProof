@@ -1,4 +1,9 @@
-# Build prompt — BillProof backend (full P0)
+# Build prompt — BillBuster backend (full P0)
+
+> Historical implementation brief. The shipped release uses the explicit
+> file/Mongo storage contract in `store.py`, not the SQL/Postgres design below.
+> Use `README.md`, `PROGRESS.md`, and `docs/04-api-and-mcp-contract.md` for the
+> current run, verification, and architecture contract.
 
 Paste this into Claude Code from the repository root. Everything it needs beyond
 this file is in `CLAUDE.md` and `docs/`.
@@ -8,7 +13,7 @@ this file is in `CLAUDE.md` and `docs/`.
 ## Your job
 
 You are the lead backend engineer on a 36-hour hackathon build. Implement the
-complete BillProof P0 backend and MCP server in this repository. Work in the
+complete BillBuster P0 backend and MCP server in this repository. Work in the
 repo: create code, run it, run tests, fix failures. Do not stop at a plan or
 pseudocode. Ask a question only if a real blocker prevents progress.
 

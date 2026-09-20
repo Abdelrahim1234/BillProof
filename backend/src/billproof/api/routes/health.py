@@ -1,21 +1,41 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 
-from billproof.db import get_db
+from billproof import store
+from billproof.api.dependencies import get_public_db
+from billproof.config import get_settings
 from billproof.errors import ok
-from billproof.repositories.hospitals import count_hospitals
+from billproof.repositories.hospitals import all_facility_ids, count_hospitals
+from billproof.repositories.prices import search_prices
 
 router = APIRouter(prefix="/api/v1", tags=["health"])
 
 
 @router.get("/health")
-def health():
+async def health():
     return ok({"status": "ok"})
 
 
 @router.get("/ready")
-def ready(db: Session = Depends(get_db)):
-    db.execute(text("SELECT 1"))
-    seeded = count_hospitals(db) > 0
-    return ok({"status": "ok", "db": "ok", "seeded": seeded})
+async def ready(db=Depends(get_public_db)):
+    check = await store.health_check()
+    settings = get_settings()
+    hospital_count = await count_hospitals(db)
+    active_facility_ids = await all_facility_ids(db)
+    eligible_price_by_hospital = [
+        bool(await search_prices(db, hospital_id=hospital_id, limit=1))
+        for hospital_id in active_facility_ids
+    ]
+    seeded = (
+        hospital_count == len(settings.active_market_facility_list)
+        and len(active_facility_ids) == hospital_count
+        and all(eligible_price_by_hospital)
+    )
+    return ok(
+        {
+            "status": check["status"],
+            "db": "ok" if check["status"] == "ok" else "degraded",
+            "backend": store.backend_name(),
+            "market_id": settings.active_market_id,
+            "seeded": seeded,
+        }
+    )

@@ -1,13 +1,11 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
-from billproof.api.dependencies import get_current_case
-from billproof.db import get_db
+from billproof.api.dependencies import get_current_case, get_private_db, get_public_db
 from billproof.errors import AppError, forbidden, not_found, ok
-from billproof.models import Analysis, Case, Packet
+from billproof.models import Case, Packet
+from billproof.repositories import case_records
 from billproof.repositories.cases import get_bill_lines
-from billproof.repositories.hospitals import get_facility
+from billproof.repositories.hospitals import get_active_facility
 from billproof.schemas.analysis import LineComparison
 from billproof.schemas.packets import PacketRequest
 from billproof.services import activity
@@ -22,24 +20,23 @@ def _require_matching_case(case_id: str, current: Case) -> None:
 
 
 @router.post("/cases/{case_id}/packet")
-def create_packet(
+async def create_packet(
     case_id: str,
     payload: PacketRequest,
     current: Case = Depends(get_current_case),
-    db: Session = Depends(get_db),
+    private_db=Depends(get_private_db),
+    public_db=Depends(get_public_db),
 ):
     _require_matching_case(case_id, current)
-    analysis = db.scalar(
-        select(Analysis).where(Analysis.case_id == case_id).order_by(Analysis.created_at.desc())
-    )
+    analysis = await case_records.get_latest_analysis(private_db, case_id)
     if not analysis:
         raise AppError(
             "ANALYSIS_REQUIRED", "Run analysis on this case before building a packet.", status_code=400
         )
 
-    lines = get_bill_lines(db, case_id)
+    lines = await get_bill_lines(private_db, case_id)
     comparisons = [LineComparison.model_validate(c) for c in analysis.result_json["line_comparisons"]]
-    hospital = get_facility(db, current.hospital_id) if current.hospital_id else None
+    hospital = await get_active_facility(public_db, current.hospital_id) if current.hospital_id else None
     hospital_name = hospital.name if hospital else "your hospital"
 
     packet_json, markdown = build_packet(
@@ -50,7 +47,7 @@ def create_packet(
         language=payload.language.value,
         hospital_name=hospital_name,
         additional_context=payload.additional_context,
-        bill_is_synthetic=activity.case_uses_synthetic_demo_bill(db, case_id),
+        bill_is_synthetic=await activity.case_uses_synthetic_demo_bill(private_db, case_id),
     )
 
     packet = Packet(
@@ -60,12 +57,10 @@ def create_packet(
         packet_json=packet_json,
         markdown=markdown,
     )
-    db.add(packet)
-    db.commit()
-    db.refresh(packet)
+    await case_records.create_packet(private_db, packet)
 
-    activity.record(
-        db,
+    await activity.record(
+        private_db,
         case_id=case_id,
         transport="rest",
         tool_name="build_negotiation_packet",
@@ -77,16 +72,16 @@ def create_packet(
 
 
 @router.get("/cases/{case_id}/packet/latest")
-def get_latest_packet(case_id: str, current: Case = Depends(get_current_case), db: Session = Depends(get_db)):
+async def get_latest_packet(case_id: str, current: Case = Depends(get_current_case), db=Depends(get_private_db)):
     _require_matching_case(case_id, current)
-    packet = db.scalar(select(Packet).where(Packet.case_id == case_id).order_by(Packet.created_at.desc()))
+    packet = await case_records.get_latest_packet(db, case_id)
     if not packet:
         raise not_found("Packet")
     return ok(_to_response(packet))
 
 
 @router.get("/cases/{case_id}/packet/latest.pdf")
-def get_latest_packet_pdf(case_id: str, current: Case = Depends(get_current_case)):
+async def get_latest_packet_pdf(case_id: str, current: Case = Depends(get_current_case)):
     _require_matching_case(case_id, current)
     raise AppError("NOT_IMPLEMENTED", "PDF packet export is not implemented in P0.", status_code=501)
 

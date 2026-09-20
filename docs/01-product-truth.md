@@ -4,7 +4,7 @@ Read this before writing any user-facing string, label, template, or disclaimer.
 
 ## The promise
 
-> BillProof identifies price differences and billing issues worth asking about,
+> BillBuster identifies price differences and billing issues worth asking about,
 > then gives the patient sourced evidence and language for that conversation.
 
 It is **not** an overcharge detector. The emotional arc is

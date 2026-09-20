@@ -1,17 +1,17 @@
-# CLAUDE.md — BillProof
+# CLAUDE.md — BillBuster
 
 Always-on rules. Everything here applies to every task in this repo. Detailed
 specs live in `docs/`; read the one a phase prompt names, not all of them.
 
 ## What this project is
 
-BillProof turns a hospital bill into a citation-backed comparison against the
+BillBuster turns a hospital bill into a citation-backed comparison against the
 hospital's own publicly disclosed prices, plus a negotiation packet (phone
 script, written request, evidence table, assistance path).
 
-Backend: Python 3.12 / FastAPI / Pydantic 2 / SQLAlchemy 2 / SQLite (Postgres
-via `DATABASE_URL`) / official MCP Python SDK.
-Frontend: Next.js (separate phase; do not touch unless the phase says so).
+Backend: Python 3.12 / FastAPI / Pydantic 2 / explicit local-file or MongoDB
+storage through `store.py` / official MCP Python SDK (`FastMCP`).
+Frontend: Next.js 16 with a same-origin, server-only backend proxy.
 
 ## Non-negotiable invariants
 
@@ -31,8 +31,9 @@ Violating any of these is a bug even if tests pass.
    "savings".
 4. **Code does the math; models only draft prose.** No LLM output is ever a
    price, a difference, a score, a citation, or an eligibility determination.
-5. **Money is `Decimal` / `Numeric(12,2)` internally and integer cents at the
-   API boundary.** Never a binary float, anywhere.
+5. **Money is `Decimal` in domain models and integer cents at the API
+   boundary.** The file and Mongo adapters serialize exact decimal values;
+   never use a binary float for money.
 6. **REST and MCP call the same service classes.** MCP tools must not call
    localhost HTTP. There is no `/mcp` REST route pretending to be a protocol.
 7. **Return `insufficient_data` rather than inventing a benchmark.** No midpoint
@@ -68,6 +69,7 @@ point, use the real one and record the difference in your final report.
 ## Commands that must keep working
 
 ```bash
+cd backend
 cp .env.example .env
 uv sync --extra dev
 uv run python scripts/seed.py
@@ -75,6 +77,12 @@ uv run uvicorn billproof.api.main:app --reload
 uv run pytest -q
 uv run ruff check .
 uv run mcp dev src/billproof/mcp_server.py
+
+cd ../frontend
+npm ci
+npm test
+npm run typecheck
+npm run build
 ```
 
 ## Docs index
@@ -88,14 +96,5 @@ uv run mcp dev src/billproof/mcp_server.py
 | `docs/05-proofmap.md` | Touching facilities, map search, evidence, cost-share |
 | `docs/99-human-tasks.md` | Never — that file is for the humans on the team |
 
----
-
-## graphify
-
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+The generated `graphify-out/` tree and bundled cross-agent skill mirrors are not
+part of the application or release workflow; they are gitignored.

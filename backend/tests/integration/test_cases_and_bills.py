@@ -1,18 +1,23 @@
+import asyncio
 import io
 import json
 from pathlib import Path
 
-from billproof.db import SessionLocal
+from billproof import store
 from billproof.models import Facility
+from billproof.repositories import hospitals as hospitals_repo
 
 FIXTURE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "fixtures"
 
 
 def _seed_demo_hospital():
+    """Sync wrapper (see test_map.py's _facility_id) so the test stays a
+    plain `def` and never fights TestClient's own blocking portal."""
     expected = json.loads((FIXTURE_DIR / "demo_bill_expected.json").read_text())
-    db = SessionLocal()
-    try:
-        db.add(
+
+    async def _seed() -> None:
+        await hospitals_repo.upsert_facility(
+            store.get_public_db(),
             Facility(
                 name=expected["hospital_name"],
                 facility_type="hospital",
@@ -20,11 +25,10 @@ def _seed_demo_hospital():
                 city="Blacksburg",
                 state="VA",
                 zip_code="24060",
-            )
+            ),
         )
-        db.commit()
-    finally:
-        db.close()
+
+    asyncio.run(_seed())
     return expected
 
 

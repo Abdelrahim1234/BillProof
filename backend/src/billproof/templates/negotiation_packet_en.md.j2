@@ -21,7 +21,7 @@ Missing: {{ packet.missing_fields | join(", ") }}
 | Code | Description | Compared amount | Public benchmark | Difference | Review |
 |---|---|---|---|---|---|
 {% for li in packet.line_items %}
-| {{ li.code or "--" }} | {{ li.description or "--" }} | {{ li.comparison_amount_text or "--" }} ({{ li.comparison_amount_label }}) | {{ li.benchmark_amount_text or "n/a" }}{% if li.benchmark_label %} ({{ li.benchmark_label }}){% endif %} | {{ li.difference_text or "n/a" }} | {{ li.review_label or li.comparison_status }} |
+| {{ li.code or "--" }} | {{ li.description or "--" }} | {{ li.comparison_amount_text or "--" }} ({{ li.comparison_amount_label }}) | {{ li.benchmark_amount_text or "n/a" }}{% if li.benchmark_label %} ({{ li.benchmark_label }}){% endif %} | {{ li.difference_text or "n/a" }}{% if li.difference_direction %} ({{ li.difference_direction }}){% endif %} | {{ li.review_label_text or li.comparison_status_text }} |
 {% endfor %}
 
 Benchmark limitations:
@@ -56,9 +56,6 @@ Benchmark limitations:
 
 ## Written review request
 {{ packet.written_request }}
-
-Patient name: {{ packet.placeholders.patient_name }}
-Account number: {{ packet.placeholders.account_number }}
 
 ## Sources
 {% for s in packet.benchmark_sources %}

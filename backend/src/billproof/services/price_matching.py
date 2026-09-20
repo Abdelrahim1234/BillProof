@@ -1,10 +1,8 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from billproof.models import PriceRecord
+from billproof.repositories import prices as prices_repo
 from billproof.schemas.analysis import MatchDetails
 
 # docs/03 "Matching tiers" mapped onto docs/03 "Confidence" base values.
@@ -45,44 +43,8 @@ def _source_warnings(records: list[PriceRecord]) -> list[str]:
     return warnings
 
 
-def _query(
-    db: Session,
-    hospital_ids: list[str],
-    code_type: str,
-    code: str,
-    *,
-    charge_type: str,
-    care_setting: str | None = None,
-    modifier: str | None = None,
-    payer_normalized: str | None = None,
-    plan_normalized: str | None = None,
-    charge_scope: str | None = None,
-) -> list[PriceRecord]:
-    stmt = select(PriceRecord).where(
-        PriceRecord.hospital_id.in_(hospital_ids),
-        PriceRecord.code_type == code_type,
-        PriceRecord.code == code,
-        PriceRecord.charge_type == charge_type,
-        PriceRecord.amount > 0,
-    )
-    if care_setting:
-        stmt = stmt.where(PriceRecord.care_setting == care_setting)
-    if modifier is not None:
-        stmt = stmt.where(PriceRecord.modifier == modifier)
-    if payer_normalized:
-        stmt = stmt.where(PriceRecord.payer_normalized == payer_normalized)
-    if plan_normalized:
-        stmt = stmt.where(PriceRecord.plan_normalized == plan_normalized)
-    if charge_scope and charge_scope != "unknown":
-        # docs/03: never match facility and professional charges as equivalent.
-        # A price record with no declared scope is excluded rather than assumed
-        # to match, once the bill line itself declares a scope.
-        stmt = stmt.where(PriceRecord.charge_scope == charge_scope)
-    return list(db.scalars(stmt))
-
-
-def find_same_hospital_negotiated(
-    db: Session,
+async def find_same_hospital_negotiated(
+    db,
     *,
     hospital_id: str,
     code_type: str,
@@ -98,7 +60,7 @@ def find_same_hospital_negotiated(
         return None
 
     if plan_normalized:
-        records = _query(
+        records = await prices_repo.query(
             db,
             [hospital_id],
             code_type,
@@ -129,7 +91,7 @@ def find_same_hospital_negotiated(
             )
 
     # payer matched, plan unmatched (or not supplied) -> lower confidence + warning
-    records = _query(
+    records = await prices_repo.query(
         db,
         [hospital_id],
         code_type,
@@ -165,8 +127,8 @@ def find_same_hospital_negotiated(
     )
 
 
-def find_same_hospital_charge_type(
-    db: Session,
+async def find_same_hospital_charge_type(
+    db,
     *,
     hospital_id: str,
     code_type: str,
@@ -177,7 +139,7 @@ def find_same_hospital_charge_type(
     charge_scope: str | None = None,
 ) -> MatchOutcome | None:
     """Same-hospital lookup for a specific charge type (cash price, allowed_median, ...)."""
-    records = _query(
+    records = await prices_repo.query(
         db,
         [hospital_id],
         code_type,
@@ -205,7 +167,7 @@ def find_same_hospital_charge_type(
         )
 
     # same hospital, code only (setting/modifier unknown)
-    records = _query(
+    records = await prices_repo.query(
         db, [hospital_id], code_type, code, charge_type=charge_type, charge_scope=charge_scope
     )
     if records:
@@ -227,8 +189,8 @@ def find_same_hospital_charge_type(
     return None
 
 
-def find_peer_charge_type(
-    db: Session,
+async def find_peer_charge_type(
+    db,
     *,
     hospital_id: str,
     peer_hospital_ids: list[str],
@@ -241,7 +203,7 @@ def find_peer_charge_type(
     peers = [h for h in peer_hospital_ids if h != hospital_id]
     if not peers:
         return None
-    records = _query(
+    records = await prices_repo.query(
         db,
         peers,
         code_type,

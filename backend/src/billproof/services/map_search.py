@@ -1,10 +1,10 @@
 from decimal import Decimal
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from billproof.enums import EvidenceAvailability, ObservedOrPublished
 from billproof.models import Facility, PriceRecord
+from billproof.repositories import benchmarks as benchmarks_repo
+from billproof.repositories import hospitals as hospitals_repo
+from billproof.repositories import prices as prices_repo
 from billproof.schemas.common import Money
 from billproof.schemas.map import (
     FacilitySearchResult,
@@ -48,8 +48,8 @@ def _record_limitations(record: PriceRecord) -> list[str]:
     return limitations
 
 
-def search_facilities(
-    db: Session,
+async def search_facilities(
+    db,
     *,
     lat: float,
     lng: float,
@@ -58,10 +58,11 @@ def search_facilities(
     code_type: str | None = None,
     facility_types: list[str] | None = None,
 ) -> list[FacilitySearchResult]:
-    stmt = select(Facility)
+    flt = hospitals_repo.active_market_filter()
     if facility_types:
-        stmt = stmt.where(Facility.facility_type.in_(facility_types))
-    facilities = list(db.scalars(stmt))
+        flt["facility_type"] = {"$in": facility_types}
+    docs = await db["facilities"].find(flt).to_list()
+    facilities = [Facility.from_doc(d) for d in docs]
 
     results = []
     for f in facilities:
@@ -71,7 +72,7 @@ def search_facilities(
         if distance > radius_miles:
             continue
         availability = (
-            evidence_availability(db, f.id, service_code, code_type)
+            await evidence_availability(db, f.id, service_code, code_type)
             if service_code and code_type
             else EvidenceAvailability.UNAVAILABLE.value
         )
@@ -94,42 +95,22 @@ def search_facilities(
     return results
 
 
-def evidence_availability(db: Session, facility_id: str, service_code: str, code_type: str) -> str:
-    exact = db.scalar(
-        select(PriceRecord).where(
-            PriceRecord.hospital_id == facility_id,
-            PriceRecord.code_type == code_type,
-            PriceRecord.code == service_code,
-            PriceRecord.care_setting != "unknown",
-            PriceRecord.charge_scope != "unknown",
-            PriceRecord.rate_unit.is_not(None),
-        )
+async def evidence_availability(db, facility_id: str, service_code: str, code_type: str) -> str:
+    rows = await prices_repo.search_prices(
+        db, hospital_id=facility_id, code_type=code_type, code=service_code, limit=1000
     )
-    if exact:
+    if any(r.care_setting != "unknown" and r.charge_scope != "unknown" and r.rate_unit is not None for r in rows):
         return EvidenceAvailability.EXACT.value
-    partial = db.scalar(
-        select(PriceRecord).where(
-            PriceRecord.hospital_id == facility_id,
-            PriceRecord.code_type == code_type,
-            PriceRecord.code == service_code,
-        )
-    )
-    if partial:
+    if rows:
         return EvidenceAvailability.PARTIAL.value
-    from billproof.models import RegionalBenchmark
-
-    regional = db.scalar(
-        select(RegionalBenchmark).where(
-            RegionalBenchmark.code_type == code_type, RegionalBenchmark.service_code == service_code
-        )
-    )
+    regional = await benchmarks_repo.any_regional_benchmark(db, code_type, service_code)
     if regional:
         return EvidenceAvailability.REGIONAL_CONTEXT.value
     return EvidenceAvailability.UNAVAILABLE.value
 
 
-def price_evidence_for_facility(
-    db: Session,
+async def price_evidence_for_facility(
+    db,
     facility: Facility,
     *,
     service_code: str,
@@ -140,12 +121,9 @@ def price_evidence_for_facility(
     from billproof.services.code_normalizer import normalize_payer
     from billproof.services.privacy import citation_for_price_record
 
-    stmt = select(PriceRecord).where(
-        PriceRecord.hospital_id == facility.id,
-        PriceRecord.code_type == code_type,
-        PriceRecord.code == service_code,
+    rows = await prices_repo.search_prices(
+        db, hospital_id=facility.id, code_type=code_type, code=service_code, limit=1000
     )
-    rows = list(db.scalars(stmt))
     if payer_name:
         norm = normalize_payer(payer_name)
         rows = [r for r in rows if r.payer_normalized in (None, norm)]

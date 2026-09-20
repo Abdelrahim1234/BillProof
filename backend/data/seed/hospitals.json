@@ -14,7 +14,7 @@
     "longitude": -80.4181,
     "financial_assistance_url": "https://lewisgalemontgomery.com/patients-visitors/billing-insurance/financial-assistance/",
     "billing_url": "https://lewisgalemontgomery.com/patients-visitors/billing-insurance/",
-    "public_price_url": "https://www.hcavirginia.com/patient-resources/patient-financial-resources/pricing-transparency-cms-required-file-of-standard-charges",
+    "public_price_url": "https://www.hcavirginia.com/locations/lewisgale-hospital-montgomery/for-patients/virginia-pricing-transparency",
     "verification_source": "https://www.hcavirginia.com/cms-hpt.txt",
     "verification_date": "2026-09-19",
     "_note": "Hospital identity and MRF source were checked against HCA Virginia's official facility and CMS price-transparency pages."
@@ -38,5 +38,25 @@
     "verification_source": "https://www.carilionclinic.org/cms-hpt.txt",
     "verification_date": "2026-09-19",
     "_note": "Hospital identity and MRF source were checked against Carilion's official CMS price-transparency files."
+  },
+  {
+    "name": "Inova Fairfax Hospital",
+    "organization_npi": "1831220714",
+    "facility_type": "hospital",
+    "address": "3300 Gallows Road",
+    "city": "Falls Church",
+    "state": "VA",
+    "zip_code": "22042",
+    "hospital_type": "Acute Care Hospitals",
+    "ownership": "Non-Profit",
+    "phone": "703-776-4001",
+    "latitude": 38.8576228,
+    "longitude": -77.226552,
+    "financial_assistance_url": "https://www.inova.org/patient-and-visitor-information/financial-assistance",
+    "billing_url": "https://www.inova.org/patient-and-visitor-information/pay-your-bill",
+    "public_price_url": "https://www.inova.org/patient-and-visitor-information/hospital-charges",
+    "verification_source": "https://www.inova.org/cms-hpt.txt",
+    "verification_date": "2026-09-19",
+    "_note": "Hospital identity and MRF source were checked against Inova's cms-hpt.txt discovery file and official patient-billing pages. organization_npi is the first of four type-2 NPIs the file lists for this facility (multi-department billing); the others are not modeled here."
   }
 ]

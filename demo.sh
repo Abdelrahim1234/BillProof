@@ -1,51 +1,76 @@
 #!/usr/bin/env bash
-# Starts the BillProof backend and frontend together for a demo, then prints the
-# address to open on the projector. Ctrl-C stops both.
-#
-#   ./demo.sh                      # LAN: the QR code targets this laptop's Wi-Fi IP
-#   PUBLIC_URL=https://x ./demo.sh # tunnel: the QR code targets that URL instead
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-backend_port="${BACKEND_PORT:-8000}"
-frontend_port="${FRONTEND_PORT:-3000}"
+DEMO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+BACKEND_PID=""
+FRONTEND_PID=""
 
 cleanup() {
-  trap - INT TERM EXIT
-  [[ -n "${backend_pid:-}" ]] && kill "$backend_pid" 2>/dev/null || true
-  [[ -n "${frontend_pid:-}" ]] && kill "$frontend_pid" 2>/dev/null || true
+  if [[ -n "${BACKEND_PID}" ]] && kill -0 "${BACKEND_PID}" 2>/dev/null; then
+    kill "${BACKEND_PID}" 2>/dev/null || true
+    wait "${BACKEND_PID}" 2>/dev/null || true
+  fi
+  if [[ -n "${FRONTEND_PID}" ]] && kill -0 "${FRONTEND_PID}" 2>/dev/null; then
+    kill "${FRONTEND_PID}" 2>/dev/null || true
+    wait "${FRONTEND_PID}" 2>/dev/null || true
+  fi
 }
-trap cleanup INT TERM EXIT
+trap cleanup EXIT INT TERM
 
-cd "$root/backend"
-[[ -f .env ]] || cp .env.example .env
-echo "==> Installing backend dependencies"
-uv sync --extra dev --quiet
-echo "==> Seeding price data"
-uv run python scripts/seed.py
-echo "==> Starting backend on 127.0.0.1:$backend_port"
-uv run uvicorn billproof.api.main:app --host 127.0.0.1 --port "$backend_port" &
-backend_pid=$!
+for command_name in uv npm curl; do
+  if ! command -v "${command_name}" >/dev/null 2>&1; then
+    echo "Missing required command: ${command_name}" >&2
+    exit 1
+  fi
+done
 
-cd "$root/frontend"
-if [[ ! -d node_modules ]]; then
-  echo "==> Installing frontend dependencies"
-  npm install --no-audit --no-fund
+echo "Preparing the locked backend environment..."
+(
+  cd "${DEMO_ROOT}/backend"
+  uv sync --extra dev --frozen
+  STORAGE_BACKEND=file uv run python scripts/seed.py
+)
+
+if [[ ! -d "${DEMO_ROOT}/frontend/node_modules" ]]; then
+  echo "Installing locked frontend dependencies..."
+  (cd "${DEMO_ROOT}/frontend" && npm ci)
 fi
-echo "==> Building frontend"
-BACKEND_URL="http://127.0.0.1:$backend_port" npm run build
-echo "==> Starting frontend on 0.0.0.0:$frontend_port"
-BACKEND_URL="http://127.0.0.1:$backend_port" npx next start -H 0.0.0.0 -p "$frontend_port" &
-frontend_pid=$!
 
-cat <<EOF
+echo "Starting BillBuster API on http://127.0.0.1:${BACKEND_PORT} ..."
+(
+  cd "${DEMO_ROOT}/backend"
+  STORAGE_BACKEND=file uv run uvicorn billproof.api.main:app --host 127.0.0.1 --port "${BACKEND_PORT}"
+) &
+BACKEND_PID=$!
 
-  Projector screen:  http://localhost:$frontend_port/present
-  Phone flow:        http://localhost:$frontend_port/
+for attempt in {1..40}; do
+  if curl -fsS "http://127.0.0.1:${BACKEND_PORT}/api/v1/ready" >/dev/null 2>&1; then
+    break
+  fi
+  if ! kill -0 "${BACKEND_PID}" 2>/dev/null; then
+    echo "The backend stopped before it became ready." >&2
+    exit 1
+  fi
+  if [[ "${attempt}" -eq 40 ]]; then
+    echo "The backend did not become ready within 20 seconds." >&2
+    exit 1
+  fi
+  sleep 0.5
+done
 
-  The projector page shows the QR code and the address phones should use.
-  Press Ctrl-C to stop both servers.
+echo
+echo "Building the production frontend..."
+(cd "${DEMO_ROOT}/frontend" && BACKEND_API_URL="http://127.0.0.1:${BACKEND_PORT}" npm run build)
 
-EOF
+echo
+echo "BillBuster is ready. Open http://localhost:${FRONTEND_PORT}/present"
+echo "Press Ctrl+C to stop both services."
+echo
 
-wait
+cd "${DEMO_ROOT}/frontend"
+BACKEND_API_URL="http://127.0.0.1:${BACKEND_PORT}" \
+  npx next start -H 0.0.0.0 -p "${FRONTEND_PORT}" &
+FRONTEND_PID=$!
+wait "${FRONTEND_PID}"

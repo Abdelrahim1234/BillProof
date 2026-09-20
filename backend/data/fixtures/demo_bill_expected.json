@@ -18,7 +18,7 @@
       "expected_comparison_status": "compared",
       "expected_confidence": "high",
       "expected_match_tier": "same_hospital_exact_code_setting_payer_plan",
-      "expected_review_score": 75,
+      "expected_review_score": 100,
       "expected_review_label": "high_review_opportunity"
     },
     {
@@ -30,9 +30,9 @@
       "units": "1",
       "billed_amount": "210.00",
       "patient_responsibility": "150.00",
-      "expected_comparison_status": "compared",
+      "expected_comparison_status": "context_only",
       "expected_review_score": null,
-      "expected_reason": "insured line with no allowed amount and no compatible payer/plan match -> contextual rates only"
+      "expected_reason": "insured line with no allowed amount: the hospital's cash price is shown as a negotiation anchor only, never scored against a patient-responsibility figure"
     },
     {
       "code": "27447",

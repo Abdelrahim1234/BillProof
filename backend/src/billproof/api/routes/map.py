@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
-from billproof.api.dependencies import get_current_case
-from billproof.db import get_db
+from billproof.api.dependencies import get_current_case, get_private_db, get_public_db
 from billproof.errors import forbidden, not_found, ok
-from billproof.models import Case, CaseEvidence, RegionalBenchmark
-from billproof.repositories.hospitals import get_facility
+from billproof.models import Case, CaseEvidence
+from billproof.repositories import benchmarks as benchmarks_repo
+from billproof.repositories import case_records
+from billproof.repositories.hospitals import get_active_facility
 from billproof.schemas.common import Money
 from billproof.schemas.map import (
     AreaBenchmarkOut,
@@ -15,6 +14,7 @@ from billproof.schemas.map import (
     OutOfPocketEstimateRequest,
 )
 from billproof.services import activity, map_search
+from billproof.services.privacy import strip_query
 
 router = APIRouter(prefix="/api/v1", tags=["map"])
 
@@ -28,7 +28,7 @@ EVIDENCE_LAYERS = [
 
 
 @router.get("/map/search")
-def map_search_route(
+async def map_search_route(
     lat: float,
     lng: float,
     radius_miles: float = 25,
@@ -38,10 +38,10 @@ def map_search_route(
     payer_name: str | None = None,
     plan_name: str | None = None,
     layers: str | None = None,
-    db: Session = Depends(get_db),
+    db=Depends(get_public_db),
 ):
     types = facility_types.split(",") if facility_types else None
-    results = map_search.search_facilities(
+    results = await map_search.search_facilities(
         db, lat=lat, lng=lng, radius_miles=radius_miles, service_code=service_code, code_type=code_type,
         facility_types=types,
     )
@@ -49,23 +49,23 @@ def map_search_route(
 
 
 @router.get("/map/legend")
-def map_legend():
+async def map_legend():
     return ok(EVIDENCE_LAYERS)
 
 
 @router.get("/facilities/{facility_id}/price-evidence")
-def facility_price_evidence(
+async def facility_price_evidence(
     facility_id: str,
     service_code: str,
     code_type: str,
     payer_name: str | None = None,
     plan_name: str | None = None,
-    db: Session = Depends(get_db),
+    db=Depends(get_public_db),
 ):
-    facility = get_facility(db, facility_id)
+    facility = await get_active_facility(db, facility_id)
     if not facility:
         raise not_found("Facility")
-    items = map_search.price_evidence_for_facility(
+    items = await map_search.price_evidence_for_facility(
         db, facility, service_code=service_code, code_type=code_type, payer_name=payer_name, plan_name=plan_name
     )
     # Facilities are returned even when evidence is unavailable (docs/05).
@@ -73,17 +73,12 @@ def facility_price_evidence(
 
 
 @router.get("/areas/{geography_type}/{geography_code}/benchmarks")
-def area_benchmarks(
-    geography_type: str, geography_code: str, service_code: str, code_type: str, db: Session = Depends(get_db)
+async def area_benchmarks(
+    geography_type: str, geography_code: str, service_code: str, code_type: str, db=Depends(get_public_db)
 ):
-    stmt = select(RegionalBenchmark).where(
-        RegionalBenchmark.geography_type == geography_type,
-        RegionalBenchmark.geography_code == geography_code,
-        RegionalBenchmark.service_code == service_code,
-        RegionalBenchmark.code_type == code_type,
-        RegionalBenchmark.suppressed.is_(False),
+    rows = await benchmarks_repo.search_regional_benchmarks(
+        db, geography_type=geography_type, geography_code=geography_code, service_code=service_code, code_type=code_type
     )
-    rows = list(db.scalars(stmt))
     out = [
         AreaBenchmarkOut(
             geography_type=r.geography_type,
@@ -100,7 +95,7 @@ def area_benchmarks(
             sample_count=r.sample_count,
             provider_count=r.provider_count,
             data_year=r.data_year,
-            source_url=r.source_url,
+            source_url=strip_query(r.source_url),
             suppressed=r.suppressed,
             limitations=r.limitations,
         )
@@ -110,7 +105,7 @@ def area_benchmarks(
 
 
 @router.post("/estimates/out-of-pocket")
-def out_of_pocket_estimate(payload: OutOfPocketEstimateRequest):
+async def out_of_pocket_estimate(payload: OutOfPocketEstimateRequest):
     result = map_search.out_of_pocket_estimate(
         allowed_amount=payload.allowed_amount,
         network_status=payload.network_status,
@@ -125,30 +120,31 @@ def out_of_pocket_estimate(payload: OutOfPocketEstimateRequest):
 
 
 @router.post("/cases/{case_id}/evidence")
-def add_case_evidence(
+async def add_case_evidence(
     case_id: str,
     payload: CaseEvidenceCreate,
     current: Case = Depends(get_current_case),
-    db: Session = Depends(get_db),
+    private_db=Depends(get_private_db),
+    public_db=Depends(get_public_db),
 ):
     if case_id != current.id:
         raise forbidden("Token does not match this case")
 
     snapshot: dict = {}
     if payload.facility_id:
-        facility = get_facility(db, payload.facility_id)
+        facility = await get_active_facility(public_db, payload.facility_id)
         if not facility:
             raise not_found("Facility")
         snapshot["facility_name"] = facility.name
         snapshot["facility_type"] = facility.facility_type
     if payload.regional_benchmark_id:
-        rb = db.get(RegionalBenchmark, payload.regional_benchmark_id)
+        rb = await benchmarks_repo.get_regional_benchmark(public_db, payload.regional_benchmark_id)
         if not rb:
             raise not_found("Regional benchmark")
         snapshot["regional_benchmark"] = {
             "geography_type": rb.geography_type,
             "geography_code": rb.geography_code,
-            "source_url": rb.source_url,
+            "source_url": strip_query(rb.source_url),
             "limitations": rb.limitations,
         }
 
@@ -161,19 +157,13 @@ def add_case_evidence(
         confidence="medium",
         snapshot_json=snapshot,
     )
-    db.add(evidence)
+    await case_records.create_evidence(private_db, evidence)
 
     # Adding evidence invalidates any prior packet built without it.
-    from billproof.models import Packet
+    await case_records.delete_packets_for_case(private_db, case_id)
 
-    for pkt in db.scalars(select(Packet).where(Packet.case_id == case_id)):
-        db.delete(pkt)
-
-    db.commit()
-    db.refresh(evidence)
-
-    activity.record(
-        db,
+    await activity.record(
+        private_db,
         case_id=case_id,
         transport="rest",
         tool_name="add_map_evidence_to_case",
@@ -185,16 +175,15 @@ def add_case_evidence(
 
 
 @router.delete("/cases/{case_id}/evidence/{evidence_id}", status_code=204)
-def remove_case_evidence(
-    case_id: str, evidence_id: str, current: Case = Depends(get_current_case), db: Session = Depends(get_db)
+async def remove_case_evidence(
+    case_id: str, evidence_id: str, current: Case = Depends(get_current_case), db=Depends(get_private_db)
 ):
     if case_id != current.id:
         raise forbidden("Token does not match this case")
-    evidence = db.get(CaseEvidence, evidence_id)
+    evidence = await case_records.get_evidence(db, evidence_id)
     if not evidence or evidence.case_id != case_id:
         raise not_found("Case evidence")
-    db.delete(evidence)
-    db.commit()
+    await case_records.delete_evidence(db, evidence_id)
 
 
 def _evidence_out(evidence: CaseEvidence) -> dict:

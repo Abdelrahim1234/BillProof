@@ -4,7 +4,7 @@ EARTH_RADIUS_MILES = 3958.8
 
 
 def haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-    """docs/05: a tested Haversine query is acceptable for SQLite/offline fixtures."""
+    """docs/05: a tested Haversine query is acceptable for local/offline fixtures."""
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     d_phi = math.radians(lat2 - lat1)
     d_lambda = math.radians(lng2 - lng1)

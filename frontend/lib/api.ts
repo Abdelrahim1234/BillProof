@@ -1,5 +1,5 @@
-// Thin client for the BillProof REST API. Same-origin: next.config.ts rewrites
-// /api/v1/* to the backend, so a phone only needs to reach this Next server.
+// Thin client for the BillBuster REST API. The browser only calls same-origin
+// /api/v1/*; the Next route handler owns the private backend origin.
 
 export type Money = { amount_cents: number; currency: string };
 
@@ -88,7 +88,7 @@ export type BenchmarkSummary = {
 
 export type LineComparison = {
   line_id: string;
-  comparison_status: "compared" | "insufficient_data";
+  comparison_status: "compared" | "context_only" | "insufficient_data";
   comparison_subject: { type: string; money: Money } | null;
   benchmark: BenchmarkSummary | null;
   difference: Money | null;
@@ -161,6 +161,8 @@ export type PriceReference = {
   source: SourceCitation;
 };
 
+export type ExplainResponse = { answer: string; model: string };
+
 /** What a presentation screen polls for: a display copy, never a token. */
 export type ScreenSubmission = {
   submission_id: string;
@@ -169,13 +171,12 @@ export type ScreenSubmission = {
   hospital_name: string | null;
   coverage_type: string;
   is_demo_bill: boolean;
-  analysis: Analysis;
+  analysis: Omit<Analysis, "analysis_id" | "case_id">;
   lines: { id: string; code: string | null; description: string | null }[];
 };
 
 export type CaseCreated = {
   case_id: string;
-  access_token: string;
   expires_at: string;
   is_demo?: boolean;
   sample?: string;
@@ -216,16 +217,40 @@ export class ApiError extends Error {
 type Envelope<T> = { data: T; request_id: string };
 type ErrorEnvelope = { error: { code: string; message: string; field: string | null } };
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+type RequestOptions = RequestInit & { timeoutMs?: number };
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const LONG_REQUEST_TIMEOUT_MS = 60_000;
+
+export async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
+  const { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, signal: callerSignal, ...fetchInit } = init;
+  const controller = new AbortController();
+  const relayAbort = () => controller.abort();
+  callerSignal?.addEventListener("abort", relayAbort, { once: true });
+  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+
   let res: Response;
   try {
-    res = await fetch(`/api/v1${path}`, { cache: "no-store", ...init });
-  } catch {
+    res = await fetch(`/api/v1${path}`, {
+      cache: "no-store",
+      ...fetchInit,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError" && !callerSignal?.aborted) {
+      throw new ApiError("The BillBuster server took too long to respond. Please try again.", "TIMEOUT", 0);
+    }
+    if (callerSignal?.aborted) {
+      throw new ApiError("The request was cancelled.", "CANCELLED", 0);
+    }
     throw new ApiError(
-      "Could not reach the BillProof server. Check that the backend is running.",
+      "Could not reach the BillBuster server. Check that the backend is running.",
       "NETWORK",
       0,
     );
+  } finally {
+    globalThis.clearTimeout(timeout);
+    callerSignal?.removeEventListener("abort", relayAbort);
   }
   const text = await res.text();
   let body: unknown = null;
@@ -241,7 +266,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (body as Envelope<T> | null)?.data as T;
 }
 
-const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 const json = { "Content-Type": "application/json" };
 
 export const api = {
@@ -268,46 +292,46 @@ export const api = {
       body: JSON.stringify(sample ? { sample } : {}),
     }),
 
-  getCase: (caseId: string, token: string) =>
-    request<CaseOut>(`/cases/${caseId}`, { headers: auth(token) }),
+  getCase: (caseId: string) => request<CaseOut>(`/cases/${caseId}`),
 
-  extract: (caseId: string, token: string, file: File) => {
+  extract: (caseId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
     return request<BillDocument>(`/cases/${caseId}/bill/extract`, {
       method: "POST",
-      headers: auth(token),
       body: form,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
     });
   },
 
-  saveLines: (caseId: string, token: string, lines: LineInput[]) =>
+  saveLines: (caseId: string, lines: LineInput[]) =>
     request<BillLineOut[]>(`/cases/${caseId}/lines/bulk`, {
       method: "POST",
-      headers: { ...auth(token), ...json },
+      headers: json,
       body: JSON.stringify({ lines }),
     }),
 
-  getBill: (caseId: string, token: string) =>
-    request<BillLineOut[]>(`/cases/${caseId}/bill`, { headers: auth(token) }),
+  getBill: (caseId: string) => request<BillLineOut[]>(`/cases/${caseId}/bill`),
 
-  analyze: (caseId: string, token: string) =>
-    request<Analysis>(`/cases/${caseId}/analysis`, { method: "POST", headers: auth(token) }),
+  analyze: (caseId: string) =>
+    request<Analysis>(`/cases/${caseId}/analysis`, {
+      method: "POST",
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
+    }),
 
-  latestAnalysis: (caseId: string, token: string) =>
-    request<Analysis>(`/cases/${caseId}/analysis/latest`, { headers: auth(token) }),
+  latestAnalysis: (caseId: string) => request<Analysis>(`/cases/${caseId}/analysis/latest`),
 
-  packet: (caseId: string, token: string, goal: string, language: string) =>
+  packet: (caseId: string, goal: string, language: string) =>
     request<PacketResponse>(`/cases/${caseId}/packet`, {
       method: "POST",
-      headers: { ...auth(token), ...json },
+      headers: json,
       body: JSON.stringify({ goal, language }),
     }),
 
-  publishToScreen: (caseId: string, token: string, roomCode: string) =>
+  publishToScreen: (caseId: string, roomCode: string) =>
     request<{ submission_id: string; room_code: string }>(`/cases/${caseId}/publish`, {
       method: "POST",
-      headers: { ...auth(token), ...json },
+      headers: json,
       body: JSON.stringify({ room_code: roomCode }),
     }),
 
@@ -317,8 +341,21 @@ export const api = {
   clearScreen: (roomCode: string) =>
     request<null>(`/screens/${encodeURIComponent(roomCode)}`, { method: "DELETE" }),
 
-  deleteCase: (caseId: string, token: string) =>
-    request<null>(`/cases/${caseId}`, { method: "DELETE", headers: auth(token) }),
+  deleteCase: (caseId: string) => request<null>(`/cases/${caseId}`, { method: "DELETE" }),
+
+  explainLine: (caseId: string, lineId: string, question?: string) =>
+    request<ExplainResponse>(`/cases/${caseId}/lines/${lineId}/explain`, {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ question: question || undefined }),
+    }),
+
+  askCase: (caseId: string, question: string) =>
+    request<ExplainResponse>(`/cases/${caseId}/ask`, {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ question }),
+    }),
 };
 
 export function formatMoney(money: Money | null | undefined): string {

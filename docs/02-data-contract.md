@@ -26,9 +26,9 @@ ObservedOrPublished: published | observed_aggregate | user_entered
 
 - snake_case keys everywhere.
 - Money object at every boundary: `{"amount_cents": 115000, "currency": "USD"}`.
-- `Decimal` / `Numeric(12,2)` internally; convert to integer cents only at the
-  boundary. Never a float for money or percentage. Percentages are decimal
-  strings, e.g. `"108.70"`.
+- `Decimal` internally; storage adapters serialize exact decimal values and the
+  API converts them to integer cents. Never a float for money or percentage.
+  Percentages are decimal strings, e.g. `"108.70"`.
 - Success: `{"data": {...}, "request_id": "opaque"}`
 - Error: `{"error": {"code": "MACHINE_CODE", "message": "...", "field": null,
   "retryable": false, "details": {}}, "request_id": "opaque"}`
@@ -78,7 +78,11 @@ For an insured case with no allowed amount and no compatible payer/plan
 reference: return contextual rates only. `difference`, `review_score`, and
 `percent_above_benchmark` are null.
 
-## Database model
+## Storage document model
+
+The same Pydantic documents are persisted by the local JSON-file adapter and
+the optional MongoDB adapter. Collection names below are logical contracts, not
+SQL tables.
 
 ### `hospitals` (generalize to `facilities` — see docs/05)
 `id` UUID · `facility_id` (CMS CCN, nullable/unique) · `organization_npi` ·
@@ -95,7 +99,7 @@ Never silently equate CCN, NPI, EIN, or a health-system identifier.
 ### `price_records`
 `id` `hospital_id` · `code_type` `code` `modifier` `description` `care_setting` ·
 `charge_type` · `payer_name` `payer_normalized` `plan_name` `plan_normalized` ·
-`amount` nullable `Numeric(12,2)` · `currency` `rate_unit` `rate_method`
+`amount` nullable `Decimal` · `currency` `rate_unit` `rate_method`
 `allowed_count` · `mrf_date` `source_url` `source_record_locator` `is_synthetic`
 `created_at`.
 
@@ -187,8 +191,8 @@ Rules:
 
 ## Bill extraction (local-first)
 
-1. Stream upload to a unique temp path.
-2. Enforce 10 MB while streaming; 20-page PDF limit.
+1. Read in bounded chunks into memory; never write the raw upload to disk.
+2. Enforce 15 MB while reading and a 20-page PDF limit.
 3. Inspect magic bytes, not extension or MIME.
 4. Accept plain text, PDF, PNG, JPEG.
 5. `pypdf` for text PDFs.
@@ -199,7 +203,8 @@ Rules:
    barcode/QR content.
 8. Parse labeled codes, descriptions, units, amount categories.
 9. Return candidates with confidence and warnings — never silently trust them.
-10. Delete the raw file in `finally`, on success **and** failure.
+10. Close the upload and drop the in-memory byte buffer in `finally`, on success
+    **and** failure.
 11. Never persist full extracted text. Never log diagnosis or procedure text.
 
 Optional Anthropic adapter (P1 only, after P0 is green): requires
@@ -213,13 +218,28 @@ tests.
 
 ```dotenv
 APP_ENV=development
-DATABASE_URL=sqlite:///./billproof.db
+ALLOW_REAL_PHI=false
+STORE_RAW_DOCUMENTS=false
+
+STORAGE_BACKEND=file
+PRIVATE_DB_NAME=billproof_private
+PUBLIC_DB_NAME=billproof_public
+MONGODB_URI=
+MONGODB_PRIVATE_DATABASE=billproof_private
+MONGODB_PUBLIC_DATABASE=billproof_public
+MONGODB_ALLOW_REMOTE=false
+
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
-MAX_UPLOAD_MB=10
+MAX_UPLOAD_MB=15
 MAX_PDF_PAGES=20
 CASE_TTL_HOURS=24
 DEMO_MODE=true
 LOG_LEVEL=INFO
+
+EXPLANATION_PROVIDER=deterministic
+EXPLANATION_MODEL=
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.6-flash
 
 EXTERNAL_PDF_EXTRACTION_ENABLED=false
 ANTHROPIC_API_KEY=
@@ -237,15 +257,18 @@ TURQUOISE_ENABLED=false
 TURQUOISE_CLIENT_ID=
 TURQUOISE_CLIENT_SECRET=
 TURQUOISE_ORGANIZATION_ID=
+
+ACTIVE_MARKET_ID=nrv_core_v1
+ACTIVE_MARKET_FACILITIES=LewisGale Hospital Montgomery,Carilion New River Valley Medical Center
 ```
 
-## Seed data target
+## Release seed boundary
 
-- At least two Southwest Virginia hospitals (LewisGale Hospital Montgomery;
-  Carilion New River Valley Medical Center), optionally a third.
-- At least eight target codes; gross, cash, and selected payer-specific/allowed
-  records where available.
-- Optionally one real CMS Medicare MS-DRG or APC benchmark.
-- One synthetic three-line bill fixture producing exactly: one exact compatible
-  match, one partial/context-only result, one `insufficient_data` result.
-- Strong-match, partial-match, and no-match expected analysis fixtures.
+- The active market is exactly LewisGale Hospital Montgomery and Carilion New
+  River Valley Medical Center (`nrv_core_v1`).
+- The runtime seed contains 21 verified, non-synthetic public price rows for
+  CPT 71046, 74177, 80053, 99284, and 99285. Full MRFs stay outside Git.
+- The hero patient bill is synthetic and identifier-free. Its CPT 80053 line is
+  above LewisGale's real cash price; its CPT 71046 line is below it.
+- Inova and urgent-care reference identities are out of market and must never
+  enter runtime evidence, analysis, presentation, or readiness results.

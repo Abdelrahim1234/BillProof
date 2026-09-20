@@ -1,31 +1,20 @@
-from datetime import datetime
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime
 
 from billproof.models import ActivityReceipt
+from billproof.repositories import case_records
 
 
-def case_uses_synthetic_demo_bill(db: Session, case_id: str) -> bool:
+async def case_uses_synthetic_demo_bill(db, case_id: str) -> bool:
     """Return whether the case came from the explicitly synthetic demo fixture.
 
     The marker is the internal receipt written only by ``POST /demo/cases``.
     Ordinary manual or uploaded bills therefore never inherit the demo notice.
     """
-    receipt_id = db.scalar(
-        select(ActivityReceipt.id)
-        .where(
-            ActivityReceipt.case_id == case_id,
-            ActivityReceipt.transport == "internal",
-            ActivityReceipt.tool_name == "create_demo_case",
-        )
-        .limit(1)
-    )
-    return receipt_id is not None
+    return await case_records.case_used_demo_marker(db, case_id)
 
 
-def record(
-    db: Session,
+async def record(
+    db,
     *,
     case_id: str,
     transport: str,
@@ -45,9 +34,6 @@ def record(
         status=status,
         summary=summary,
         source_ids=source_ids or [],
-        completed_at=datetime.utcnow(),
+        completed_at=datetime.now(UTC),
     )
-    db.add(receipt)
-    db.commit()
-    db.refresh(receipt)
-    return receipt
+    return await case_records.record_activity(db, receipt)

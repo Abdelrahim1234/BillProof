@@ -1,78 +1,125 @@
-# How to use this kit
+# BillBuster: start here
 
-## What it is
+This file describes the current application. The repository is a monorepo with
+two application directories:
 
-Your three documents, restructured so Claude Code carries the project's context
-in the repo instead of you re-pasting it every session.
-
-```
-CLAUDE.md              ← auto-loaded every session. The invariants.
-BUILD_BACKEND.md       ← the one prompt you paste. Points at the docs.
-docs/01-product-truth.md        Language, labels, safety, accessibility
-docs/02-data-contract.md        Enums, JSON, models, ingestion, extraction, .env
-docs/03-matching-and-scoring.md Matching tiers, benchmarks, confidence, score
-docs/04-api-and-mcp-contract.md Repo layout, REST, MCP, tests
-docs/05-proofmap.md             Facilities, map, evidence, cost-share
-docs/99-human-tasks.md          What you have to do by hand
+```text
+frontend/   Next.js patient flow, projector screen, and server-side API proxy
+backend/    FastAPI REST API, FastMCP server, seed/admin scripts, and storage
+docs/       Product, data, matching, privacy, and implementation contracts
 ```
 
-## Setup (2 minutes)
+For the complete production-mode local experience, run `./demo.sh` from the
+repository root and open `http://localhost:3000/present`.
+
+## Current data scope
+
+The active market is `nrv_core_v1` and contains exactly two hospitals:
+
+- LewisGale Hospital Montgomery
+- Carilion New River Valley Medical Center
+
+The seed contains 21 verified, non-synthetic price rows from those hospitals'
+official machine-readable files. The example patient bill is synthetic and is
+labeled that way throughout the flow.
+
+Inova Fairfax and the urgent-care identities may remain in seed or stored data,
+but they are outside the active market. Runtime hospital lookup, public price
+evidence, analysis, map search, and readiness checks exclude them. Stored rows
+also must be non-synthetic and tied to an active source manifest before they can
+be returned as public evidence.
+
+## Run the complete app locally
+
+The one-command judge path is:
 
 ```bash
-cd <your-repo>
-# copy CLAUDE.md to the repo root and docs/ alongside it
-git add CLAUDE.md docs/ && git commit -m "Add project context for Claude Code"
+./demo.sh
 ```
 
-Then open Claude Code in the repo root and paste the contents of
-`BUILD_BACKEND.md` as your first message.
+For separate development servers, start the backend in one terminal:
 
-## Why this shape
+```bash
+cd backend
+cp .env.example .env       # only when .env does not already exist
+uv sync --extra dev
+uv run python scripts/seed.py
+uv run uvicorn billproof.api.main:app --host 127.0.0.1 --port 8000
+```
 
-**`CLAUDE.md` is the important file.** Claude Code loads it automatically on
-every session and every compaction, so the ten invariants survive context resets.
-That is the "project understands what it's doing" part — in a 1,000-line pasted
-prompt, rule #3 is forgotten by hour six; in `CLAUDE.md` it is re-read constantly.
+Start the frontend in a second terminal:
 
-**The docs are referenced, not pasted.** `BUILD_BACKEND.md` tells the agent which
-doc to read at which stage, so a matching-rules doc isn't sitting in context
-while it writes Dockerfiles.
+```bash
+cd frontend
+cp .env.example .env.local # only when .env.local does not already exist
+npm ci
+npm run dev
+```
 
-**`PROGRESS.md` is the resume handle.** The build prompt has the agent keep it
-updated and re-read it after a context reset, so a compaction mid-Stage-6 doesn't
-restart the build.
+Open <http://localhost:3000> for the patient flow or
+<http://localhost:3000/present> for the projector screen. Browser requests stay
+on port 3000; the Next.js server-side proxy forwards `/api/v1/*` to the backend
+origin configured by `BACKEND_API_URL`. Case credentials are kept in an
+HttpOnly cookie rather than exposed to browser JavaScript.
 
-## What I changed from your originals
+For a production-mode local frontend build, use `npm run present` instead of
+`npm run dev`.
 
-- **Deduplicated.** The cost-share formula appeared in all three files with
-  slightly different variable names; the amount-type table appeared twice; the
-  ProofMap endpoints appeared twice. One canonical copy each now.
-- **Resolved a conflict.** The blueprint treats ProofMap as a second hero
-  feature; the backend prompt says it "takes precedence if an earlier scope
-  statement treats maps as optional." `CLAUDE.md` now states the precedence rule
-  explicitly so the agent doesn't have to guess.
-- **Cut the pitch material.** Sections 18–22 of the blueprint (demo script, judge
-  Q&A, Devpost copy, track mapping) are ~200 lines the coding agent never needs.
-  Keep them for yourself.
-- **Flagged a likely bug in your own spec.** `CLAUDE_BACKEND_BUILD_PROMPT.md`
-  hardcodes `from mcp.server import MCPServer` with `mcp[cli]>=2,<3`. If that
-  import is wrong for the SDK version that actually installs, the agent will
-  spend an hour fighting it and may invent a workaround. `CLAUDE.md` now tells it
-  to verify the real export before writing tool code.
-- **Moved ProofMap tables into Stage 2.** Your original order adds them late,
-  which means a schema migration mid-hackathon. They're free to create upfront.
-- **Pulled out human-only work.** Verifying real MRF rows and urgent-care
-  locations is the one thing that decides whether your demo has real cited prices.
-  It can't be delegated to the CLI and it was buried in checkboxes across two
-  files.
+## Verify only the backend
 
-## Two things worth deciding before you start
+With the backend running:
 
-1. **ProofMap in P0 or not?** It roughly doubles the backend surface — six more
-   MCP tools, seven more endpoints, five more tables. If the team is 2–3 people,
-   consider cutting it to P1 and editing Stage 8 out of `BUILD_BACKEND.md`. The
-   core bill → comparison → packet flow is the thing judges score.
-2. **Frontend prompt.** There isn't one in your three documents — only the
-   backend brief exists. You'll want an equivalent `BUILD_FRONTEND.md` that
-   consumes the OpenAPI schema this backend generates. Worth writing once Stage 4
-   is green and the contract is stable.
+```bash
+curl -s http://127.0.0.1:8000/api/v1/health
+curl -s http://127.0.0.1:8000/api/v1/ready
+curl -s http://127.0.0.1:8000/api/v1/demo/samples
+```
+
+FastAPI serves interactive API documentation at
+<http://127.0.0.1:8000/docs> and the generated schema at
+<http://127.0.0.1:8000/openapi.json>.
+
+The active-market readiness command checks both hospitals, real source
+manifests, non-synthetic evidence, stable citation URLs, the two hero codes,
+both analysis scenarios, and case deletion:
+
+```bash
+cd backend
+uv run python -m scripts.readiness
+```
+
+## Tests
+
+```bash
+cd backend
+uv run pytest -q
+uv run ruff check .
+
+cd ../frontend
+npm test
+npm run typecheck
+npm run build
+```
+
+## Storage
+
+Local development and tests use `STORAGE_BACKEND=file`, which writes two
+gitignored JSON stores under `data/store/`. MongoDB is an explicit
+server-side option using the same repositories; setting `MONGODB_URI` alone
+does not activate it. See `backend/docs/ATLAS_SETUP.md` for configuration,
+index initialization, redacted inventory, and reversible cleanup planning.
+
+Never place `MONGODB_URI` or the backend origin in a `NEXT_PUBLIC_*` variable.
+
+## Documentation map
+
+- `CLAUDE.md` — non-negotiable product and safety invariants
+- `docs/01-product-truth.md` — language, labels, safety, and accessibility
+- `docs/02-data-contract.md` — enums, models, ingestion, and extraction
+- `docs/03-matching-and-scoring.md` — matching tiers and review scoring
+- `docs/04-api-and-mcp-contract.md` — intended REST and MCP behavior
+- `docs/05-proofmap.md` — facilities, evidence, map, and cost-share behavior
+- `docs/99-human-tasks.md` — source verification that requires human review
+- `backend/README.md` — backend operation and demo commands
+- `backend/docs/API_CONTRACT.md` — routes implemented by the current backend
+- `frontend/README.md` — patient flow, projector mode, and frontend settings

@@ -1,0 +1,199 @@
+{
+  "active_market": {
+    "configured_facility_count": 2,
+    "market_id": "nrv_core_v1",
+    "matching_facility_count": 2
+  },
+  "databases": [
+    {
+      "collections": [
+        {
+          "classification": "KEEP_REQUIRED",
+          "document_count": 6,
+          "document_id_fingerprint": "bed5db5bb21eb6201ceeaee5787ee64da6a26d6b9d86b1a1710a41a2392bdc13",
+          "indexes": [
+            {
+              "keys": [
+                [
+                  "_id",
+                  1
+                ]
+              ],
+              "name": "_id_",
+              "sparse": false,
+              "ttl_seconds": null,
+              "unique": false
+            }
+          ],
+          "legacy_test_demo_name_indicators": [],
+          "name": "facilities",
+          "storage_size_bytes": null
+        },
+        {
+          "active_counts": {
+            "absent": 0,
+            "false": 0,
+            "true": 2
+          },
+          "classification": "KEEP_REQUIRED",
+          "document_count": 2,
+          "document_id_fingerprint": "5b10f601a8c75d1f3bc276ce57147d1fd15677c02859554387077265d9b31a42",
+          "indexes": [
+            {
+              "keys": [
+                [
+                  "_id",
+                  1
+                ]
+              ],
+              "name": "_id_",
+              "sparse": false,
+              "ttl_seconds": null,
+              "unique": false
+            }
+          ],
+          "legacy_test_demo_name_indicators": [],
+          "name": "hospital_sources",
+          "storage_size_bytes": null
+        },
+        {
+          "classification": "KEEP_REQUIRED",
+          "document_count": 21,
+          "document_id_fingerprint": "d6078e80d555a757b1ea303dc19d0dbd1104f0585c2ed6519c755e20c4519869",
+          "indexes": [
+            {
+              "keys": [
+                [
+                  "_id",
+                  1
+                ]
+              ],
+              "name": "_id_",
+              "sparse": false,
+              "ttl_seconds": null,
+              "unique": false
+            }
+          ],
+          "legacy_test_demo_name_indicators": [],
+          "name": "price_records",
+          "storage_size_bytes": null,
+          "synthetic_counts": {
+            "absent": 0,
+            "false": 21,
+            "true": 0
+          }
+        },
+        {
+          "classification": "KEEP_SHARED_REFERENCE",
+          "document_count": 8,
+          "document_id_fingerprint": "cae20a351c04ee92a18d88879c7a2acb075d05b963ddf0da86a8abac7ca7ebac",
+          "indexes": [
+            {
+              "keys": [
+                [
+                  "_id",
+                  1
+                ]
+              ],
+              "name": "_id_",
+              "sparse": false,
+              "ttl_seconds": null,
+              "unique": false
+            }
+          ],
+          "legacy_test_demo_name_indicators": [],
+          "name": "service_bundles",
+          "storage_size_bytes": null
+        }
+      ],
+      "name": "billproof_public",
+      "role": "public"
+    },
+    {
+      "collections": [
+        {
+          "classification": "KEEP_PRIVATE_CASE_DATA",
+          "document_count": 0,
+          "document_id_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "indexes": [
+            {
+              "keys": [
+                [
+                  "_id",
+                  1
+                ]
+              ],
+              "name": "_id_",
+              "sparse": false,
+              "ttl_seconds": null,
+              "unique": false
+            }
+          ],
+          "legacy_test_demo_name_indicators": [],
+          "name": "bill_lines",
+          "storage_size_bytes": null
+        },
+        {
+          "classification": "KEEP_PRIVATE_CASE_DATA",
+          "document_count": 0,
+          "document_id_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "indexes": [
+            {
+              "keys": [
+                [
+                  "_id",
+                  1
+                ]
+              ],
+              "name": "_id_",
+              "sparse": false,
+              "ttl_seconds": null,
+              "unique": false
+            }
+          ],
+          "legacy_test_demo_name_indicators": [],
+          "name": "cases",
+          "storage_size_bytes": null
+        }
+      ],
+      "name": "billproof_private",
+      "role": "private"
+    }
+  ],
+  "deterministic_duplicate_counts": {
+    "hospital_sources": {
+      "duplicate_excess_documents": 0,
+      "duplicate_groups": 0
+    },
+    "price_records": {
+      "duplicate_excess_documents": 0,
+      "duplicate_groups": 0
+    }
+  },
+  "generated_at": "2026-09-20T11:19:53.783846+00:00",
+  "missing_required_provenance_counts": {
+    "hospital_sources": 0,
+    "price_records": 0
+  },
+  "notes": [
+    "No document bodies, raw document identifiers, filenames, OCR text, URLs, or credentials are included.",
+    "A null storage size means the selected backend cannot safely expose collStats.",
+    "Duplicate counts are informational; no duplicate is a cleanup candidate without review."
+  ],
+  "orphan_reference_counts": {
+    "bill_lines_missing_case": 0,
+    "hospital_sources_missing_facility": 0,
+    "price_records_missing_facility": 0
+  },
+  "redacted": true,
+  "schema_version": 1,
+  "target": {
+    "backend": "file",
+    "databases": {
+      "private": "billproof_private",
+      "public": "billproof_public"
+    },
+    "target_id": "db4314cd20b755f126c1"
+  },
+  "unknown_collections_requiring_review": []
+}

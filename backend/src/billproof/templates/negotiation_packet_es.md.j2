@@ -21,7 +21,7 @@ Falta: {{ packet.missing_fields | join(", ") }}
 | Codigo | Descripcion | Monto comparado | Punto de comparacion publico | Diferencia | Revision |
 |---|---|---|---|---|---|
 {% for li in packet.line_items %}
-| {{ li.code or "--" }} | {{ li.description or "--" }} | {{ li.comparison_amount_text or "--" }} ({{ li.comparison_amount_label }}) | {{ li.benchmark_amount_text or "n/a" }}{% if li.benchmark_label %} ({{ li.benchmark_label }}){% endif %} | {{ li.difference_text or "n/a" }} | {{ li.review_label or li.comparison_status }} |
+| {{ li.code or "--" }} | {{ li.description or "--" }} | {{ li.comparison_amount_text or "--" }} ({{ li.comparison_amount_label }}) | {{ li.benchmark_amount_text or "n/a" }}{% if li.benchmark_label %} ({{ li.benchmark_label }}){% endif %} | {{ li.difference_text or "n/a" }}{% if li.difference_direction %} ({{ li.difference_direction }}){% endif %} | {{ li.review_label_text or li.comparison_status_text }} |
 {% endfor %}
 
 Limitaciones del punto de comparacion:
@@ -56,9 +56,6 @@ Limitaciones del punto de comparacion:
 
 ## Solicitud escrita de revision
 {{ packet.written_request }}
-
-Nombre del paciente: {{ packet.placeholders.patient_name }}
-Numero de cuenta: {{ packet.placeholders.account_number }}
 
 ## Fuentes
 {% for s in packet.benchmark_sources %}

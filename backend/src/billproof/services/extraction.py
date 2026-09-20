@@ -6,6 +6,7 @@ from pypdf import PdfReader
 
 from billproof.errors import AppError
 from billproof.schemas.bills import BillDocument, ExtractedLineCandidate
+from billproof.services.code_normalizer import normalize_code
 from billproof.services.privacy import mask_identity_fields
 
 MAX_TEXT_BYTES_FOR_SNIFF = 4096
@@ -104,6 +105,73 @@ def parse_labeled_bill_text(text: str) -> BillDocument:
     return BillDocument(lines=candidates, needs_manual_entry=not candidates, warnings=warnings)
 
 
+# Real hospital itemized statements ("Itemization of Hospital Services"),
+# not the synthetic labeled-block demo fixture above. Common HCA-family
+# layout: revenue-code section headers, then rows of
+#   DATE  [CODE]  UNITS  DESCRIPTION  $ AMOUNT
+# where CODE is absent for pure facility/revenue-code charges (room, OR,
+# anesthesia), "00000" for supply lines with no procedure code, or a
+# zero-padded 5-digit HCPCS/CPT number (e.g. "080053" -> 80053). The digit
+# lengths of CODE (5-6) and UNITS (1-4) never overlap, so a single regex
+# disambiguates them without guessing.
+_ITEMIZATION_ROW = re.compile(
+    r"^\s*(?P<date>\d{1,2}/\d{1,2}/\d{4})\s+"
+    r"(?:(?P<code>\d{5,6})\s+)?"
+    r"(?P<units>\d{1,4})\s+"
+    r"(?P<description>.+?)\s+"
+    r"\$\s*(?P<amount>[\d,]+\.\d{2})\s*$"
+)
+
+
+def parse_itemization_table(text: str) -> BillDocument:
+    """Parses a real hospital itemized-statement table (docs/02 point 8:
+    "parse labeled codes, descriptions, units, amount categories" -- this is
+    the free-form-table sibling of parse_labeled_bill_text's fixed-label
+    format). Section headers ("0112 - ROOM AND CARE") and "Subtotal:" lines
+    never match the row pattern (no leading date) and are skipped, not
+    misread as items."""
+    candidates: list[ExtractedLineCandidate] = []
+
+    for raw_line in text.splitlines():
+        m = _ITEMIZATION_ROW.match(raw_line)
+        if not m:
+            continue
+
+        code_raw = m.group("code")
+        # "00000" is this format's explicit "no procedure code applies"
+        # placeholder (facility supply/OR/anesthesia lines), not a real code.
+        has_real_code = bool(code_raw) and code_raw != "00000"
+        # This statement format zero-pads a 5-digit code to 6 digits
+        # ("080053" -> 80053); that's this layout's own convention, not a
+        # normalize_code() concern, so unwrap it before handing off.
+        code_for_lookup = code_raw[1:] if has_real_code and len(code_raw) == 6 and code_raw[0] == "0" else code_raw
+        normalized = normalize_code(code_for_lookup) if has_real_code else None
+
+        warnings = []
+        if not has_real_code:
+            warnings.append("No billing code on this line; comparison may be limited.")
+
+        candidates.append(
+            ExtractedLineCandidate(
+                code_raw=code_raw,
+                code=normalized.code if normalized else None,
+                code_type=normalized.code_type if normalized else "UNKNOWN",
+                description=m.group("description").strip(),
+                units=_to_decimal(m.group("units")) or Decimal(1),
+                billed_amount=_to_decimal(m.group("amount")),
+                extraction_confidence="high" if has_real_code else "medium",
+                needs_manual_review=not has_real_code,
+                warnings=warnings,
+            )
+        )
+
+    return BillDocument(
+        lines=candidates,
+        needs_manual_entry=not candidates,
+        warnings=[] if candidates else ["No itemized rows were recognized in this document."],
+    )
+
+
 def extract_bill(data: bytes, *, max_pdf_pages: int) -> BillDocument:
     media_type = sniff_media_type(data)
 
@@ -136,4 +204,7 @@ def extract_bill(data: bytes, *, max_pdf_pages: int) -> BillDocument:
         raise AppError("UNSUPPORTED_MEDIA_TYPE", "Unsupported file type.", status_code=415)
 
     text = mask_identity_fields(text)
+    tabular = parse_itemization_table(text)
+    if tabular.lines:
+        return tabular
     return parse_labeled_bill_text(text)

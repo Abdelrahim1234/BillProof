@@ -2,14 +2,12 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
-from billproof.api.dependencies import get_current_case
+from billproof.api.dependencies import get_current_case, get_private_db
 from billproof.config import get_settings
-from billproof.db import get_db
 from billproof.errors import AppError, forbidden, not_found, ok
 from billproof.models import BillLine, Case
+from billproof.repositories import cases as cases_repo
 from billproof.schemas.bills import BillLineOut, BulkConfirmRequest
 from billproof.services import activity
 from billproof.services.extraction import extract_bill
@@ -27,7 +25,7 @@ async def extract(
     case_id: str,
     file: UploadFile,
     current: Case = Depends(get_current_case),
-    db: Session = Depends(get_db),
+    db=Depends(get_private_db),
 ):
     _require_matching_case(case_id, current)
     settings = get_settings()
@@ -48,7 +46,7 @@ async def extract(
         data = b""  # never persisted; drop the reference before returning
         await file.close()
 
-    activity.record(
+    await activity.record(
         db,
         case_id=current.id,
         transport="rest",
@@ -61,15 +59,15 @@ async def extract(
 
 
 @router.post("/cases/{case_id}/bill/manual")
-def manual_bill(
+async def manual_bill(
     case_id: str,
     payload: BulkConfirmRequest,
     current: Case = Depends(get_current_case),
-    db: Session = Depends(get_db),
+    db=Depends(get_private_db),
 ):
     _require_matching_case(case_id, current)
-    lines = _insert_lines(db, current.id, payload.lines, confirmed=True)
-    activity.record(
+    lines = await cases_repo.create_bill_lines(db, current.id, payload.lines, confirmed=True)
+    await activity.record(
         db,
         case_id=current.id,
         transport="rest",
@@ -82,9 +80,9 @@ def manual_bill(
 
 
 @router.get("/cases/{case_id}/bill")
-def get_bill(case_id: str, current: Case = Depends(get_current_case), db: Session = Depends(get_db)):
+async def get_bill(case_id: str, current: Case = Depends(get_current_case), db=Depends(get_private_db)):
     _require_matching_case(case_id, current)
-    lines = list(db.scalars(select(BillLine).where(BillLine.case_id == case_id)))
+    lines = await cases_repo.get_bill_lines(db, case_id)
     return ok([_line_out(l) for l in lines])
 
 
@@ -105,14 +103,14 @@ class BillLinePatch(BaseModel):
 
 
 @router.patch("/cases/{case_id}/bill")
-def patch_bill_line(
+async def patch_bill_line(
     case_id: str,
     payload: BillLinePatch,
     current: Case = Depends(get_current_case),
-    db: Session = Depends(get_db),
+    db=Depends(get_private_db),
 ):
     _require_matching_case(case_id, current)
-    line = db.get(BillLine, payload.line_id)
+    line = await cases_repo.get_bill_line(db, payload.line_id)
     if not line or line.case_id != case_id:
         raise not_found("Bill line")
     if line.version != payload.expected_version:
@@ -123,24 +121,22 @@ def patch_bill_line(
             retryable=True,
         )
     updates = payload.model_dump(exclude={"line_id", "expected_version"}, exclude_unset=True)
-    for key, value in updates.items():
-        setattr(line, key, value)
+    line = line.model_copy(update=updates)
     line.version += 1
-    db.commit()
-    db.refresh(line)
+    await cases_repo.save_bill_line(db, line)
     return ok(_line_out(line))
 
 
 @router.post("/cases/{case_id}/lines/bulk")
-def bulk_confirm(
+async def bulk_confirm(
     case_id: str,
     payload: BulkConfirmRequest,
     current: Case = Depends(get_current_case),
-    db: Session = Depends(get_db),
+    db=Depends(get_private_db),
 ):
     _require_matching_case(case_id, current)
-    lines = _insert_lines(db, current.id, payload.lines, confirmed=True)
-    activity.record(
+    lines = await cases_repo.create_bill_lines(db, current.id, payload.lines, confirmed=True)
+    await activity.record(
         db,
         case_id=current.id,
         transport="rest",
@@ -150,34 +146,6 @@ def bulk_confirm(
         summary=f"Confirmed {len(lines)} line item(s) from extracted candidates.",
     )
     return ok([_line_out(l) for l in lines])
-
-
-def _insert_lines(db: Session, case_id: str, inputs, *, confirmed: bool) -> list[BillLine]:
-    lines = []
-    for item in inputs:
-        line = BillLine(
-            case_id=case_id,
-            code_raw=item.code_raw,
-            code=item.code,
-            code_type=item.code_type.value,
-            modifiers=item.modifiers,
-            description=item.description,
-            units=item.units,
-            rate_unit=item.rate_unit,
-            billed_amount=item.billed_amount,
-            allowed_amount=item.allowed_amount,
-            insurer_paid=item.insurer_paid,
-            patient_responsibility=item.patient_responsibility,
-            charge_scope=item.charge_scope.value,
-            care_setting=item.care_setting.value,
-            confirmed=confirmed,
-        )
-        db.add(line)
-        lines.append(line)
-    db.commit()
-    for line in lines:
-        db.refresh(line)
-    return lines
 
 
 def _line_out(line: BillLine) -> dict:

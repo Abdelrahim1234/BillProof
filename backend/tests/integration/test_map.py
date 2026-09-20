@@ -1,11 +1,10 @@
+import asyncio
 import subprocess
 import sys
 from pathlib import Path
 
-from sqlalchemy import select
-
-from billproof.db import SessionLocal
-from billproof.models import Facility
+from billproof import store
+from billproof.repositories import hospitals as hospitals_repo
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -22,11 +21,15 @@ def _run_seed():
 
 
 def _facility_id(name: str) -> str:
-    db = SessionLocal()
-    try:
-        return db.scalar(select(Facility).where(Facility.name == name)).id
-    finally:
-        db.close()
+    """Sync wrapper: these tests are plain `def`s driving the sync TestClient,
+    so this runs its own short-lived event loop rather than making every
+    caller async (and fighting TestClient's own blocking portal)."""
+
+    async def _get() -> str:
+        facility = await hospitals_repo.get_facility_by_name(store.get_public_db(), name)
+        return facility.id
+
+    return asyncio.run(_get())
 
 
 def test_map_search_returns_facilities_within_radius(client):
@@ -34,7 +37,7 @@ def test_map_search_returns_facilities_within_radius(client):
     resp = client.get("/api/v1/map/search", params={"lat": 37.2001, "lng": -80.4181, "radius_miles": 25})
     assert resp.status_code == 200
     rows = resp.json()["data"]
-    assert len(rows) == 5  # 2 hospitals + 3 urgent care
+    assert len(rows) == 2  # the two facilities in nrv_core_v1
     distances = [r["distance_miles"] for r in rows]
     assert distances == sorted(distances)
 
@@ -81,13 +84,13 @@ def test_facility_price_evidence_exact_and_unavailable(client):
     lewisgale_result = next(row for row in search.json()["data"] if row["id"] == lewisgale_id)
     assert lewisgale_result["evidence_availability"] == "partial"
 
-    no_price_id = _facility_id("Family Urgent Care of Montgomery County")
+    no_price_id = _facility_id("Carilion New River Valley Medical Center")
     empty = client.get(
         f"/api/v1/facilities/{no_price_id}/price-evidence",
-        params={"service_code": "71046", "code_type": "CPT"},
+        params={"service_code": "99999", "code_type": "CPT"},
     )
     assert empty.status_code == 200
-    assert empty.json()["data"] == []  # facility still returned by search even with no evidence
+    assert empty.json()["data"] == []  # active facility remains visible even with no matching evidence
 
 
 def test_out_of_pocket_estimate_endpoint(client):

@@ -1,0 +1,64 @@
+{
+  "_notice": "SYNTHETIC. Modeled on the line-shape of a real uploaded bill; all amounts altered, no identifiers. Not a real bill.",
+  "facility": "LewisGale Hospital Montgomery",
+  "care_setting": "inpatient",
+  "coded_lines": [
+    {
+      "code": "80053",
+      "code_type": "CPT_HCPCS",
+      "description": "COMP METABOLIC PANEL",
+      "billed_amount": "1385.59"
+    },
+    {
+      "code": "85027",
+      "code_type": "CPT_HCPCS",
+      "description": "CBC AUTOMATED",
+      "billed_amount": "304.53"
+    },
+    {
+      "code": "85027",
+      "code_type": "CPT_HCPCS",
+      "description": "CBC AUTOMATED",
+      "billed_amount": "304.53"
+    },
+    {
+      "code": "85027",
+      "code_type": "CPT_HCPCS",
+      "description": "CBC AUTOMATED",
+      "billed_amount": "304.53"
+    },
+    {
+      "code": "86900",
+      "code_type": "CPT_HCPCS",
+      "description": "ABO TYPE",
+      "billed_amount": "165.30"
+    },
+    {
+      "code": "86850",
+      "code_type": "CPT_HCPCS",
+      "description": "ANTIBODY SCREEN EA",
+      "billed_amount": "391.94"
+    },
+    {
+      "code": "97163",
+      "code_type": "CPT_HCPCS",
+      "description": "EVAL PT HIGH COMPLEX",
+      "billed_amount": "881.96"
+    },
+    {
+      "code": "71046",
+      "code_type": "CPT_HCPCS",
+      "description": "CHEST X-RAY",
+      "billed_amount": "1100.00",
+      "care_setting": "outpatient"
+    }
+  ],
+  "uncoded_lines": [
+    { "description": "ROOM AND CARE", "billed_amount": "4200.00" },
+    { "description": "BASIC C-SECTION SERVICES", "billed_amount": "3904.84" },
+    { "description": "OB BASIC RECOVRY SERVICE", "billed_amount": "612.00" },
+    { "description": "SUTURE UND MONO 3-0 27IN", "billed_amount": "144.00" },
+    { "description": "IBUPROFEN 800 MG PO", "billed_amount": "28.00" },
+    { "description": "SPINAL ANESTHETIC", "billed_amount": "3241.13" }
+  ]
+}

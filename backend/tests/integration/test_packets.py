@@ -122,6 +122,35 @@ def test_user_entered_bill_does_not_get_demo_notice(client):
     assert "This patient bill is a synthetic fixture" not in packet["markdown"]
 
 
+def test_hero_packet_uses_judge_ready_labels_money_and_pluralization(client):
+    _run_seed()
+    created = client.post("/api/v1/demo/cases", json={"sample": "nrv_cash_review"}).json()["data"]
+    headers = {"Authorization": f"Bearer {created['access_token']}"}
+    case_id = created["case_id"]
+    client.post(f"/api/v1/cases/{case_id}/analysis", headers=headers)
+
+    response = client.post(
+        f"/api/v1/cases/{case_id}/packet",
+        headers=headers,
+        json={"goal": "billing_review", "language": "en"},
+    )
+
+    assert response.status_code == 200
+    markdown = response.json()["data"]["markdown"]
+    assert "We compared 2 line items" in markdown
+    assert "found 1 item worth asking about" in markdown
+    assert "-$87.00 (below)" in markdown
+    assert "$1,385.59" in markdown
+    assert "this hospital's disclosed cash price" in markdown
+    assert "Strong review opportunity" in markdown
+    assert "Limited signal" in markdown
+    assert "hospital_discounted_cash" not in markdown
+    assert "strong_review_opportunity" not in markdown
+    assert "item(s)" not in markdown
+    assert markdown.count("Patient name:") == 1
+    assert markdown.count("Account number:") == 1
+
+
 def test_no_wording_claims_illegal_or_guaranteed(client):
     case_id, headers = _demo_case_with_analysis(client)
     resp = client.post(

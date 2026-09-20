@@ -1,12 +1,9 @@
-
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
-from billproof.api.dependencies import get_current_case
-from billproof.db import get_db
+from billproof.api.dependencies import get_current_case, get_private_db, get_public_db
 from billproof.errors import AppError, forbidden, not_found, ok
 from billproof.models import Analysis, Case
+from billproof.repositories.case_records import get_latest_analysis
 from billproof.repositories.cases import get_bill_lines
 from billproof.services import activity
 from billproof.services.analysis import run_and_persist_analysis
@@ -24,17 +21,21 @@ def _to_response(analysis: Analysis) -> dict:
 
 
 @router.post("/cases/{case_id}/analysis")
-def run_analysis(case_id: str, current: Case = Depends(get_current_case), db: Session = Depends(get_db)):
+async def run_analysis(
+    case_id: str,
+    current: Case = Depends(get_current_case),
+    db=Depends(get_private_db),
+    public_db=Depends(get_public_db),
+):
     _require_matching_case(case_id, current)
-    lines = get_bill_lines(db, case_id)
+    lines = await get_bill_lines(db, case_id)
     if not lines:
         raise AppError("NO_BILL_LINES", "This case has no bill lines to analyze.", status_code=400)
 
-    analysis, comparisons = run_and_persist_analysis(db, current, lines)
+    analysis, _comparisons = await run_and_persist_analysis(public_db, db, current, lines)
 
-    scored = sum(1 for c in comparisons if c.comparison_status == "compared" and c.review_score is not None)
-    unmatched = sum(1 for c in comparisons if c.comparison_status == "insufficient_data")
-    activity.record(
+    summary = analysis.result_json["summary"]
+    await activity.record(
         db,
         case_id=case_id,
         transport="rest",
@@ -42,21 +43,19 @@ def run_analysis(case_id: str, current: Case = Depends(get_current_case), db: Se
         display_name="Bill analysis run",
         status="success",
         summary=(
-            f"Compared {len(comparisons)} line item(s): {scored} scored, "
-            f"{unmatched} without a defensible match."
+            f"Compared {summary['total']} line item(s): {summary['compared']} scored, "
+            f"{summary['context_only']} context only, {summary['insufficient_data']} without a defensible match."
         ),
     )
     return ok(_to_response(analysis))
 
 
 @router.get("/cases/{case_id}/analysis/latest")
-def get_latest_analysis(
-    case_id: str, current: Case = Depends(get_current_case), db: Session = Depends(get_db)
+async def get_latest_analysis_route(
+    case_id: str, current: Case = Depends(get_current_case), db=Depends(get_private_db)
 ):
     _require_matching_case(case_id, current)
-    analysis = db.scalar(
-        select(Analysis).where(Analysis.case_id == case_id).order_by(Analysis.created_at.desc())
-    )
+    analysis = await get_latest_analysis(db, case_id)
     if not analysis:
         raise not_found("Analysis")
     return ok(_to_response(analysis))

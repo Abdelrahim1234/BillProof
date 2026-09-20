@@ -20,6 +20,12 @@ uploads_tmp/
 /.bob/
 /.claude/
 /data/skills/
+/data/store/
 /graphify-out/
 /skills-lock.json
 /BillProof/
+/frontend_session_backup/
+
+# Exact cleanup IDs stay local; only the redacted inventory and markdown plan
+# are safe to review/commit.
+/artifacts/mongo_cleanup_manifest.private.json

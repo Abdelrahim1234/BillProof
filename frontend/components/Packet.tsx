@@ -49,7 +49,7 @@ export default function Packet({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "billproof-packet.md";
+    a.download = "billbuster-packet.md";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -96,7 +96,7 @@ export default function Packet({
           <pre className="script">{packet.packet.written_request}</pre>
           <CopyButton text={packet.packet.written_request} label="Copy written request" />
           <p className="muted small">
-            Fill in your name and account number yourself when you send it. BillProof never stores them.
+            Fill in your name and account number yourself when you send it. BillBuster never stores them.
           </p>
 
           <h2>Questions to ask</h2>

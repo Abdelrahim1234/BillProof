@@ -1,15 +1,14 @@
 #!/usr/bin/env sh
-# Container entrypoint for hosts that inject $PORT (Railway, Fly, Render, Cloud Run).
-# Seeding is upsert-style, so running it on every boot is safe and makes a fresh
-# container come up already populated with the verified price rows.
-set -e
+set -eu
 
+# Container entrypoint for hosts that inject PORT. Seeding is idempotent, so a
+# fresh preview comes up with the small verified demo extract already loaded.
 PORT="${PORT:-8000}"
 
 if [ "${RUN_SEED:-true}" = "true" ]; then
-  echo "==> Seeding price data"
+  echo "==> Seeding BillBuster reference data"
   uv run python scripts/seed.py
 fi
 
-echo "==> Starting API on 0.0.0.0:${PORT}"
+echo "==> Starting BillBuster API on 0.0.0.0:${PORT}"
 exec uv run uvicorn billproof.api.main:app --host 0.0.0.0 --port "${PORT}"

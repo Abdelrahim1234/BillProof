@@ -9,6 +9,10 @@ uploads_tmp/
 dist/
 *.egg-info/
 data/seed/ingest_history.json
+data/store/
+
+# Exact cleanup IDs are operational metadata, never a public artifact.
+../artifacts/mongo_cleanup_manifest.private.json
 
 # Never commit full hospital machine-readable files. Keep only curated extracts.
 data/raw/

@@ -10,11 +10,10 @@ COPY data ./data
 COPY start.sh ./start.sh
 
 RUN uv sync --no-dev --frozen
+RUN chmod +x ./start.sh
 
-ENV DATABASE_URL=sqlite:///./billproof.db
-# Hosts like Railway and Fly inject $PORT; start.sh honours it and falls back to 8000.
+ENV STORAGE_BACKEND=file
 ENV PORT=8000
 EXPOSE 8000
 
-RUN chmod +x ./start.sh
 CMD ["./start.sh"]

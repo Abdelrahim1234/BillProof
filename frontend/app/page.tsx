@@ -19,8 +19,10 @@ import LineEditor, { blankLine, type EditableLine } from "@/components/LineEdito
 import Results from "@/components/Results";
 import Packet from "@/components/Packet";
 
-type Step = "start" | "setup" | "upload" | "review" | "results" | "packet" | "sent";
-type Session = { caseId: string; token: string; isDemo: boolean };
+type Step = "start" | "setup" | "upload" | "review" | "results" | "packet" | "sent" | "legacy";
+// The case credential is an HttpOnly, same-site cookie owned by the BFF. Only
+// non-secret resume metadata is kept in browser storage.
+type Session = { caseId: string; isDemo: boolean; consented: boolean };
 
 const SESSION_KEY = "billproof.session";
 const STEP_LABELS: [Step, string][] = [
@@ -95,6 +97,7 @@ export default function Home() {
   const [payerName, setPayerName] = useState("");
   const [planName, setPlanName] = useState("");
   const [careSetting, setCareSetting] = useState("outpatient");
+  const [aiConsent, setAiConsent] = useState(false);
 
   const [editable, setEditable] = useState<EditableLine[]>([]);
   const [extractNotes, setExtractNotes] = useState<string[]>([]);
@@ -166,14 +169,21 @@ export default function Home() {
     (async () => {
       try {
         const [a, lines] = await Promise.all([
-          api.latestAnalysis(saved.caseId, saved.token),
-          api.getBill(saved.caseId, saved.token),
+          api.latestAnalysis(saved.caseId),
+          api.getBill(saved.caseId),
         ]);
         setSession(saved);
         setAnalysis(a);
         setSavedLines(lines);
         setStep("results");
-      } catch {
+      } catch (e) {
+        if (e instanceof ApiError && e.code === "CASE_OUTSIDE_ACTIVE_MARKET") {
+          // Keep both the non-secret case ID and the HttpOnly capability so
+          // the owner can still exercise the lifecycle-only DELETE route.
+          setSession(saved);
+          setStep("legacy");
+          return;
+        }
         try {
           sessionStorage.removeItem(SESSION_KEY);
         } catch {
@@ -198,8 +208,8 @@ export default function Home() {
     setStatus("Comparing your bill against published prices.");
 
     if (screenMode && roomCode) {
-      await api.analyze(s.caseId, s.token);
-      await api.publishToScreen(s.caseId, s.token, roomCode);
+      await api.analyze(s.caseId);
+      await api.publishToScreen(s.caseId, roomCode);
       setBusy(null);
       setStatus("Sent to the screen.");
       setStep("sent");
@@ -207,9 +217,9 @@ export default function Home() {
     }
 
     const [a, lines, caseInfo] = await Promise.all([
-      api.analyze(s.caseId, s.token),
-      api.getBill(s.caseId, s.token),
-      api.getCase(s.caseId, s.token),
+      api.analyze(s.caseId),
+      api.getBill(s.caseId),
+      api.getCase(s.caseId),
     ]);
     setAnalysis(a);
     setSavedLines(lines);
@@ -230,13 +240,13 @@ export default function Home() {
     setBusy("Loading the example bill…");
     try {
       const created = await api.demoCase(sample);
-      const s = { caseId: created.case_id, token: created.access_token, isDemo: true };
+      const s = { caseId: created.case_id, isDemo: true, consented: true };
       store(s);
       if (screenMode) {
         await runAnalysis(s);
         return;
       }
-      const lines = await api.getBill(s.caseId, s.token);
+      const lines = await api.getBill(s.caseId);
       setSavedLines(lines);
       setBusy(null);
       setStep("review");
@@ -260,8 +270,9 @@ export default function Home() {
         plan_name: insured && planName.trim() ? planName.trim() : null,
         care_setting: careSetting,
         language: "en",
+        external_processing_consent: aiConsent,
       });
-      const s = { caseId: created.case_id, token: created.access_token, isDemo: false };
+      const s = { caseId: created.case_id, isDemo: false, consented: aiConsent };
       store(s);
       await loadFacility(hospitalId);
       try {
@@ -291,7 +302,7 @@ export default function Home() {
     setBusy("Reading your bill…");
     setStatus("Reading the document you uploaded.");
     try {
-      const doc = await api.extract(session.caseId, session.token, file);
+      const doc = await api.extract(session.caseId, file);
       const lines = doc.lines.map(fromCandidate);
       setEditable(lines.length > 0 ? lines : [blankLine(careSetting)]);
       setExtractNotes(
@@ -329,7 +340,7 @@ export default function Home() {
     }
     setBusy("Saving your lines…");
     try {
-      await api.saveLines(session.caseId, session.token, usable.map(toLineInput));
+      await api.saveLines(session.caseId, usable.map(toLineInput));
       await runAnalysis(session);
     } catch (e) {
       fail(e);
@@ -351,7 +362,7 @@ export default function Home() {
     setError(null);
     setBusy("Preparing your packet…");
     try {
-      const p = await api.packet(session.caseId, session.token, nextGoal, nextLanguage);
+      const p = await api.packet(session.caseId, nextGoal, nextLanguage);
       setPacket(p);
       setBusy(null);
       setStep("packet");
@@ -379,7 +390,7 @@ export default function Home() {
     if (!confirm("Delete this case and everything in it now?")) return;
     setBusy("Deleting…");
     try {
-      await api.deleteCase(session.caseId, session.token);
+      await api.deleteCase(session.caseId);
       setBusy(null);
       setStatus("Your case was deleted.");
       restart();
@@ -394,11 +405,11 @@ export default function Home() {
   return (
     <>
       <div className="masthead">
-        <span className="wordmark">BillProof</span>
+        <span className="wordmark">BillBuster</span>
         <span className="tagline">public prices, cited</span>
       </div>
       <main>
-      {step !== "start" && (
+      {step !== "start" && step !== "legacy" && (
         <ol className="progress">
           {stepLabels.map(([s, label], i) => (
             <li key={s} aria-current={s === step ? "step" : undefined}>
@@ -422,6 +433,32 @@ export default function Home() {
 
       {busy && <p className="note">{busy}</p>}
 
+      {step === "legacy" && session && (
+        <>
+          <h1>This saved case can&apos;t be reopened</h1>
+          <p>
+            Its hospital is no longer part of this BillBuster market, so the case cannot be viewed,
+            changed, or analyzed.
+          </p>
+          <p className="muted">
+            Your valid case session can still delete the case and all of its stored data.
+          </p>
+          <div className="actions">
+            <button
+              type="button"
+              className="primary"
+              onClick={() => void deleteCase()}
+              disabled={Boolean(busy)}
+            >
+              Delete this saved case
+            </button>
+            <button type="button" onClick={restart} disabled={Boolean(busy)}>
+              Start over without deleting
+            </button>
+          </div>
+        </>
+      )}
+
       {step === "start" && (
         <>
           {pick ? (
@@ -441,10 +478,12 @@ export default function Home() {
                 </span>
               </button>
 
-              <div className="two-up">
-                <button type="button" onClick={shuffle} disabled={Boolean(busy) || samples.length < 2}>
-                  Show me another
-                </button>
+              <div className={samples.length > 1 ? "two-up" : "single-action"}>
+                {samples.length > 1 && (
+                  <button type="button" onClick={shuffle} disabled={Boolean(busy)}>
+                    Show me another
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -548,6 +587,27 @@ export default function Home() {
               </option>
             ))}
           </select>
+
+          {!screenMode && (
+            <label htmlFor="ai-consent" style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+              <input
+                id="ai-consent"
+                type="checkbox"
+                checked={aiConsent}
+                onChange={(e) => setAiConsent(e.target.checked)}
+                style={{ width: "auto", minHeight: 0, marginTop: "0.2rem" }}
+              />
+              <span style={{ textTransform: "none", fontWeight: 400, letterSpacing: "normal" }}>
+                Allow AI-assisted explanations (optional)
+                <p className="muted small" style={{ margin: "0.2rem 0 0" }}>
+                  Lets you ask questions about your bill in plain language. The default explainer stays on
+                  this server, but a deployment may explicitly use Google Gemini. If Gemini is enabled, your
+                  bill line descriptions and comparison results may be sent to Google—never your name or an
+                  identifier. Leave unchecked to skip this feature entirely.
+                </p>
+              </span>
+            </label>
+          )}
 
           <div className="actions">
             <button type="button" className="primary" onClick={createCase} disabled={Boolean(busy)}>
@@ -710,6 +770,7 @@ export default function Home() {
           onDelete={() => void deleteCase()}
           onRestart={restart}
           busy={Boolean(busy)}
+          ask={session?.consented ? { caseId: session.caseId } : undefined}
         />
       )}
 

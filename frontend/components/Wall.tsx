@@ -8,7 +8,25 @@ import { BarsLegend, PairedBars, scaleFor } from "@/components/Bars";
 const POLL_MS = 3000;
 
 function Qr({ svg }: { svg: string }) {
-  return <div className="qr" dangerouslySetInnerHTML={{ __html: svg }} />;
+  return (
+    <div
+      className="qr"
+      role="img"
+      aria-label="QR code for the BillBuster phone demo"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+}
+
+type DemoStatus = { tone: "checking" | "ready" | "error"; message: string };
+
+function Status({ value }: { value: DemoStatus }) {
+  return (
+    <p className={`demo-status ${value.tone}`} role="status" aria-live="polite">
+      <span aria-hidden="true">{value.tone === "ready" ? "●" : value.tone === "error" ? "▲" : "○"}</span>{" "}
+      {value.message}
+    </p>
+  );
 }
 
 /** Sum of the compatible differences, so the room gets one headline number. */
@@ -33,8 +51,21 @@ function comparedTotals(submission: ScreenSubmission) {
   return { charged, published };
 }
 
-export default function Wall({ svg, roomCode }: { svg: string; roomCode: string }) {
+export default function Wall({
+  svg,
+  roomCode,
+  phoneUrl,
+}: {
+  svg: string;
+  roomCode: string;
+  phoneUrl: string;
+}) {
   const [submission, setSubmission] = useState<ScreenSubmission | null>(null);
+  const [status, setStatus] = useState<DemoStatus>({
+    tone: "checking",
+    message: "Checking the backend and verified price data…",
+  });
+  const [copied, setCopied] = useState(false);
   // After a clear, the poll would immediately re-fetch the bill we just cleared
   // if the delete had not landed yet. Remember what we dismissed and ignore it.
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -42,15 +73,39 @@ export default function Wall({ svg, roomCode }: { svg: string; roomCode: string 
   useEffect(() => {
     let active = true;
     const tick = async () => {
-      try {
-        const next = await api.screenLatest(roomCode);
-        if (!active) return;
+      const [readiness, latest] = await Promise.allSettled([
+        api.ready(),
+        api.screenLatest(roomCode),
+      ]);
+      if (!active) return;
+
+      if (readiness.status === "fulfilled") {
+        const ready = readiness.value;
+        if (ready.status === "ok" && ready.db === "ok" && ready.seeded) {
+          setStatus(
+            latest.status === "fulfilled"
+              ? { tone: "ready", message: "Ready — backend connected and verified price data loaded." }
+              : { tone: "error", message: "Backend connected, but screen updates are unavailable. Refresh before the demo." },
+          );
+        } else {
+          setStatus({
+            tone: "error",
+            message: "Not ready — load the verified price data before starting the demo.",
+          });
+        }
+      } else {
+        setStatus({
+          tone: "error",
+          message: "Backend unavailable — start the API, then refresh this screen.",
+        });
+      }
+
+      if (latest.status === "fulfilled") {
+        const next = latest.value;
         if (next && next.submission_id === dismissed) return;
         setSubmission((current) =>
           current && next && current.submission_id === next.submission_id ? current : next,
         );
-      } catch {
-        /* keep the last bill on screen rather than blanking the room */
       }
     };
     void tick();
@@ -60,6 +115,15 @@ export default function Wall({ svg, roomCode }: { svg: string; roomCode: string 
       clearInterval(id);
     };
   }, [roomCode, dismissed]);
+
+  const copyPhoneUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(phoneUrl);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   // Presenter control: wipe the wall and wait for the next scan.
   const clearScreen = async () => {
@@ -85,6 +149,13 @@ export default function Wall({ svg, roomCode }: { svg: string; roomCode: string 
         </div>
         <div className="stage-scan">
           <Qr svg={svg} />
+          <p className="stage-url">
+            <a href={phoneUrl}>{phoneUrl}</a>
+          </p>
+          <button type="button" className="copy-demo-link" onClick={() => void copyPhoneUrl()}>
+            {copied ? "Link copied" : "Copy phone link"}
+          </button>
+          <Status value={status} />
         </div>
       </div>
     );
@@ -118,6 +189,7 @@ export default function Wall({ svg, roomCode }: { svg: string; roomCode: string 
           <button type="button" className="wall-reset" onClick={() => void clearScreen()}>
             Clear screen
           </button>
+          <Status value={status} />
         </div>
       </header>
 

@@ -1,10 +1,21 @@
 import { headers } from "next/headers";
+import { randomBytes } from "node:crypto";
 import QRCode from "qrcode";
 import Wall from "@/components/Wall";
 import { isLoopback, lanAddress } from "@/lib/lan";
 
 // The projector page: a QR code judges scan, and the comparison they send back.
 export const dynamic = "force-dynamic";
+
+const ROOM_PATTERN = /^[a-z0-9-]{12,32}$/;
+
+function presentationRoom(requested?: string): string {
+  const candidate = (requested ?? process.env.ROOM_CODE ?? "").toLowerCase();
+  if (ROOM_PATTERN.test(candidate)) return candidate;
+  // An unguessable capability URL is the presentation wall's access control.
+  // It is generated server-side and reaches phones only through the QR code.
+  return randomBytes(16).toString("hex");
+}
 
 /**
  * Where to send phones, in order of preference:
@@ -36,8 +47,7 @@ export default async function PresentPage({
   const params = await searchParams;
   const { url } = await resolvePublicUrl(params.url);
 
-  // Stable by default, so the QR can be printed and survives restarts.
-  const roomCode = (params.room ?? process.env.ROOM_CODE ?? "billproof").toLowerCase();
+  const roomCode = presentationRoom(params.room);
   const phoneUrl = `${url}/?room=${encodeURIComponent(roomCode)}`;
   const svg = await QRCode.toString(phoneUrl, {
     type: "svg",
@@ -45,5 +55,5 @@ export default async function PresentPage({
     errorCorrectionLevel: "M",
   });
 
-  return <Wall svg={svg} roomCode={roomCode} />;
+  return <Wall svg={svg} roomCode={roomCode} phoneUrl={phoneUrl} />;
 }

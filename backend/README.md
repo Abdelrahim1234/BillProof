@@ -1,4 +1,4 @@
-# BillProof backend
+# BillBuster backend
 
 Turns a hospital bill into a citation-backed comparison against the
 hospital's own publicly disclosed prices, plus a negotiation packet (phone
@@ -11,6 +11,11 @@ from the official LewisGale Montgomery and Carilion NRV machine-readable files.
 Original-file hashes, retrieval times, and exact row locators are checked in;
 the 326 MB and 56 MB source files are not. The patient statement remains
 visibly synthetic.
+
+The runtime market is `nrv_core_v1`: LewisGale Hospital Montgomery and
+Carilion New River Valley Medical Center only. Inova Fairfax and the seeded
+urgent-care identities are retained outside that market, but are not returned
+by runtime hospital, price-evidence, analysis, map, or readiness paths.
 
 ## Setup
 
@@ -26,11 +31,16 @@ The API is now at `http://127.0.0.1:8000`. Interactive OpenAPI docs at
 `/docs`; the raw schema is served at `/openapi.json` (no static export
 needed -- FastAPI generates it live from the route/schema definitions).
 
+`STORAGE_BACKEND=file` is the default and persists two gitignored JSON files
+under the workspace-level `../data/store/`. Optional Atlas support uses the same repositories through
+PyMongo's async client; see `docs/ATLAS_SETUP.md`. A URI alone never activates
+remote storage.
+
 ## Tests and lint
 
 ```bash
-uv run pytest -q          # 60 tests: unit + integration + MCP protocol tests
-uv run ruff check .        # clean
+uv run pytest -q           # unit, integration, MCP, storage, and contract tests
+uv run ruff check .
 ```
 
 ## MCP server
@@ -49,34 +59,70 @@ imported directly and driven over `mcp.shared.memory` for in-process testing
 ## Docker
 
 ```bash
-docker compose up --build                 # API + seed, SQLite volume
-docker compose --profile postgres up --build   # also starts Postgres
+docker compose up --build                 # API + seed, local file-store volume
 ```
 
-To point the API at the Postgres service, set `DATABASE_URL` before
-bringing the stack up:
+To use Atlas, configure the server-only MongoDB variables from
+`.env.example`, including both explicit remote opt-ins, before starting
+Compose:
 
 ```bash
-DATABASE_URL=postgresql+psycopg://billproof:billproof@db:5432/billproof \
-  docker compose --profile postgres up --build
+STORAGE_BACKEND=mongodb MONGODB_ALLOW_REMOTE=true docker compose up --build
 ```
 
-Nothing else changes -- SQLite and Postgres share the same models and
-migrations-free `create_all` bootstrap.
+Do not put the URI in the Compose file or a frontend environment variable.
+
+## Storage inventory and cleanup planning
+
+```bash
+uv run python -m scripts.mongo_inventory --redact
+uv run python -m scripts.mongo_cleanup --dry-run
+```
+
+These commands emit a redacted inventory and reviewable cleanup plan under
+`../artifacts/`. Dry-run is the default. The exact-ID manifest is mode `0600`
+and gitignored; apply supports reversible quarantine only, never deletion.
+See `docs/ATLAS_SETUP.md` for the target, stale-plan, backup, and remote-write
+gates.
+
+## Verify the active market and demo
+
+The readiness command is the complete gate. It checks the two active-market
+hospitals, active source manifests, non-synthetic evidence, stable citation
+URLs, the two hero codes, self-pay and commercial/no-EOB outcomes, and the case
+deletion cascade. No running server is required.
+
+```bash
+uv run python -m scripts.readiness
+```
+
+For a focused analysis report, run either scenario directly:
+
+```bash
+uv run python -m scripts.verify_demo                                    # uninsured, LewisGale
+uv run python -m scripts.verify_demo --coverage commercial --payer Cigna --plan NPR
+uv run python -m scripts.verify_demo --json                             # machine-readable, for CI
+```
+
+`verify_demo` diagnoses one analysis scenario. Its synthetic-evidence check is
+reported rather than exit-blocking, so use `scripts.readiness` for the final
+go/no-go decision.
 
 ## Five-step judge demo
 
 ```bash
-# 1. Start the API (see Setup above), then create the offline demo case --
-#    no network access required.
-curl -s -X POST http://127.0.0.1:8000/api/v1/demo/cases | tee /tmp/demo.json
+# 1. Start the API (see Setup above), then create the offline hero case --
+#    a synthetic bill with real cited hospital prices; no network required.
+curl -s -X POST http://127.0.0.1:8000/api/v1/demo/cases \
+  -H "Content-Type: application/json" \
+  -d '{"sample": "nrv_cash_review"}' | tee /tmp/demo.json
 
 # 2. Pull the token out of the response.
 TOKEN=$(jq -r .data.access_token /tmp/demo.json)
 CASE_ID=$(jq -r .data.case_id /tmp/demo.json)
 
-# 3. Run the deterministic analysis: one exact/scored match, one contextual
-#    (no-allowed-amount) result, one insufficient_data result.
+# 3. Run the deterministic analysis. The two real cash-price comparisons have
+#    opposite conclusions: one line is above and one is below its benchmark.
 curl -s -X POST http://127.0.0.1:8000/api/v1/cases/$CASE_ID/analysis \
   -H "Authorization: Bearer $TOKEN" | jq .data.status
 
@@ -113,9 +159,9 @@ backend/
 ├── pyproject.toml, .env.example, Dockerfile, docker-compose.yml
 ├── data/seed/        facility identity, verified price extract + provenance, service bundles
 ├── data/fixtures/    parser-only synthetic MRF fixtures, demo bill (txt/pdf) + expected outcomes
-├── scripts/          seed.py, ingest_mrf.py, purge_expired_cases.py (all admin CLI -- never called from a request)
+├── scripts/          seed, readiness, ingestion, retention, and Mongo admin CLIs
 ├── src/billproof/
-│   ├── config.py, db.py, models.py, enums.py, errors.py, logging_config.py
+│   ├── config.py, store.py, models.py, enums.py, errors.py, logging_config.py
 │   ├── api/          FastAPI app, routes, case-token dependency
 │   ├── schemas/       Pydantic request/response models
 │   ├── repositories/  read/write queries, no business logic
@@ -138,11 +184,13 @@ backend/
   so those fields are honestly stored as `unknown` and surfaced as limitations.
 - The demo patient statement is synthetic and visibly labeled. Its CPT 71046
   comparison uses the real LewisGale Cigna/NPR disclosed rate of $206.54.
-- The three urgent-care locations remain unverified placeholders and have no
-  seeded price rows; fake `example.invalid` prices were removed.
-- One urgent-care location (`Family Urgent Care of Montgomery County`) is
-  seeded with **no** price data on purpose, to exercise the honest
-  `unavailable` evidence state end-to-end.
+- Inova Fairfax and the three urgent-care identities are outside
+  `nrv_core_v1`. They may remain stored for future work, but runtime clients
+  cannot select them or use their rows as evidence. The urgent-care identities
+  have no seeded prices.
+- Runtime evidence must be `is_synthetic=false`, belong to the active market,
+  and resolve to an active source manifest with provenance. These checks happen
+  in the repository layer, not only in the UI or readiness script.
 
 ## Known P0 gaps (not blocking, see PROGRESS.md's final report)
 

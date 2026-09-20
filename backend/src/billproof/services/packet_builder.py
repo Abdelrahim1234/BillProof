@@ -38,8 +38,8 @@ SYNTHETIC_DEMO_NOTICE = {
 }
 
 SUMMARY_INTRO = {
-    "en": "We compared {n} line item(s) from this bill against the hospital's own publicly disclosed prices.",
-    "es": "Comparamos {n} partida(s) de esta cuenta con los precios publicos que el hospital ya ha divulgado.",
+    "en": "We compared {line_count} from this bill against the hospital's own publicly disclosed prices.",
+    "es": "Comparamos {line_count} de esta cuenta con los precios publicos que el hospital ya ha divulgado.",
 }
 
 NO_COMPARISON_POSTURE = {
@@ -109,13 +109,13 @@ EOB_CHECKLIST = {
 PHONE_SCRIPT = {
     "en": (
         "Hello, I'm calling about a bill from {hospital}. I've compared some of the charges to the "
-        "hospital's own publicly posted prices and found {n_review} item(s) worth asking about. "
+        "hospital's own publicly posted prices and found {review_count} worth asking about. "
         "Could you help me understand which rate and billing code were applied, and whether a "
         "self-pay discount, cash-price match, or financial-assistance review is available?"
     ),
     "es": (
         "Hola, llamo por una cuenta de {hospital}. Compare algunos de los cargos con los precios "
-        "publicos que el hospital ya ha divulgado y encontre {n_review} partida(s) que vale la pena "
+        "publicos que el hospital ya ha divulgado y encontre {review_count} que vale la pena "
         "preguntar. ¿Podrian ayudarme a entender que tarifa y codigo de facturacion se aplicaron, y si "
         "hay disponible un descuento por pago en efectivo, igualacion de precio, o revision de "
         "asistencia financiera?"
@@ -126,7 +126,7 @@ WRITTEN_REQUEST = {
     "en": (
         "To Whom It May Concern,\n\n"
         "I am requesting a review of my recent bill from {hospital}. Based on the hospital's own "
-        "publicly disclosed prices, I found {n_review} line item(s) with an amount worth asking "
+        "publicly disclosed prices, I found {review_count} with an amount worth asking "
         "about. Please provide an itemized explanation of the billing code and rate applied to each "
         "line, and let me know whether a self-pay discount, cash-price match, or financial-assistance "
         "review is available.\n\n"
@@ -137,7 +137,7 @@ WRITTEN_REQUEST = {
     "es": (
         "A quien corresponda,\n\n"
         "Solicito una revision de mi cuenta reciente de {hospital}. Segun los precios publicos que el "
-        "hospital ya ha divulgado, encontre {n_review} partida(s) con un monto que vale la pena "
+        "hospital ya ha divulgado, encontre {review_count} con un monto que vale la pena "
         "preguntar. Por favor proporcionen una explicacion detallada del codigo de facturacion y la "
         "tarifa aplicada a cada partida, e informenme si hay disponible un descuento por pago en "
         "efectivo, igualacion de precio, o revision de asistencia financiera.\n\n"
@@ -166,34 +166,104 @@ SUBJECT_LABELS = {
 BENCHMARK_LABELS = {
     "en": {
         "payer_negotiated_rate": "your plan's disclosed negotiated rate",
+        "hospital_discounted_cash": "this hospital's disclosed cash price",
+        "peer_discounted_cash": "another local hospital's disclosed cash price",
+        "hospital_allowed_median": "this hospital's de-identified allowed-amount median",
+        "peer_payer_negotiated_rate": "another local hospital's disclosed negotiated rate",
+        "medicare_ffs_hospital_aggregate": "Medicare average payment at this hospital",
         "hospital_discounted_cash_anchor": "hospital disclosed cash price",
+        "hospital_deidentified_range_context": "de-identified allowed-amount range",
     },
     "es": {
         "payer_negotiated_rate": "tarifa negociada divulgada de su plan",
+        "hospital_discounted_cash": "precio en efectivo divulgado por este hospital",
+        "peer_discounted_cash": "precio en efectivo divulgado por otro hospital local",
+        "hospital_allowed_median": "mediana desidentificada de montos permitidos de este hospital",
+        "peer_payer_negotiated_rate": "tarifa negociada divulgada por otro hospital local",
+        "medicare_ffs_hospital_aggregate": "pago promedio de Medicare en este hospital",
         "hospital_discounted_cash_anchor": "precio en efectivo divulgado por el hospital",
+        "hospital_deidentified_range_context": "rango desidentificado de montos permitidos",
     },
+}
+
+REVIEW_LABELS = {
+    "en": {
+        "high_review_opportunity": "High review opportunity",
+        "strong_review_opportunity": "Strong review opportunity",
+        "review_recommended": "Review recommended",
+        "limited_discrepancy_signal": "Limited signal",
+    },
+    "es": {
+        "high_review_opportunity": "Alta oportunidad de revision",
+        "strong_review_opportunity": "Oportunidad clara de revision",
+        "review_recommended": "Revision recomendada",
+        "limited_discrepancy_signal": "Senal limitada",
+    },
+}
+
+COMPARISON_STATUS_LABELS = {
+    "en": {
+        "compared": "Compared",
+        "context_only": "Context only",
+        "insufficient_data": "Not enough information",
+    },
+    "es": {
+        "compared": "Comparado",
+        "context_only": "Solo contexto",
+        "insufficient_data": "Informacion insuficiente",
+    },
+}
+
+DIRECTION_LABELS = {
+    "en": {"above": "above", "below": "below", "matches": "matches"},
+    "es": {"above": "por encima", "below": "por debajo", "matches": "coincide"},
 }
 
 
 def _money_text(value: Decimal | None) -> str | None:
-    return f"${value.quantize(Decimal('0.01'))}" if value is not None else None
+    if value is None:
+        return None
+    amount = value.quantize(Decimal("0.01"))
+    sign = "-" if amount < 0 else ""
+    return f"{sign}${abs(amount):,.2f}"
+
+
+def _line_count(n: int, language: str) -> str:
+    if language == "es":
+        return f"{n} partida" if n == 1 else f"{n} partidas"
+    return f"{n} line item" if n == 1 else f"{n} line items"
+
+
+def _review_count(n: int, language: str) -> str:
+    if language == "es":
+        return f"{n} partida" if n == 1 else f"{n} partidas"
+    return f"{n} item" if n == 1 else f"{n} items"
 
 
 @lru_cache
 def _source_metadata_by_url() -> dict[str, dict]:
-    """Load checked-in source caveats without fetching either full MRF."""
+    """Load checked-in source caveats without fetching either full MRF.
+
+    Keyed by both citation_url and the resolved source_url: citation_for_price_record()
+    now exposes citation_url as the public SourceCitation.source_url (CLAUDE_FINAL_DEMO_HARDENING
+    Fix 2 -- never the raw signed retrieval URL), so a reference's public
+    source_url is the citation page, not the file origin. Indexing both keeps
+    this lookup correct regardless of which one a reference actually carries.
+    """
     try:
         entries = json.loads(PROVENANCE_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    return {
-        entry["source_url"]: {
+    metadata: dict[str, dict] = {}
+    for entry in entries:
+        details = {
             "source_name": entry.get("hospital_name", "hospital MRF"),
             "limitations": entry.get("limitations", []),
         }
-        for entry in entries
-        if entry.get("source_url")
-    }
+        for key in (entry.get("citation_url"), entry.get("source_url")):
+            if key:
+                metadata[key] = details
+    return metadata
 
 
 def _source_limitations(sources: list[dict]) -> list[dict[str, str]]:
@@ -240,7 +310,14 @@ def _line_item_view(line: BillLine, comparison: LineComparison, language: str) -
         "difference_text": _money_text(comparison.difference.to_decimal())
         if comparison.difference
         else None,
+        "difference_direction": DIRECTION_LABELS[language].get(comparison.direction or ""),
         "review_label": comparison.review_label,
+        "review_label_text": REVIEW_LABELS[language].get(
+            comparison.review_label or "", comparison.review_label
+        ),
+        "comparison_status_text": COMPARISON_STATUS_LABELS[language].get(
+            comparison.comparison_status, comparison.comparison_status
+        ),
         "confidence": comparison.benchmark.confidence if comparison.benchmark else None,
         "limitations": (comparison.benchmark.limitations if comparison.benchmark else [])
         + comparison.warnings,
@@ -274,7 +351,7 @@ def build_packet(
 
     any_scored = any(li["comparison_status"] == "compared" and li["review_label"] for li in line_items)
     summary = (
-        SUMMARY_INTRO[lang].format(n=len(line_items))
+        SUMMARY_INTRO[lang].format(line_count=_line_count(len(line_items), lang))
         if any_scored or line_items
         else NO_COMPARISON_POSTURE[lang]
     )
@@ -306,8 +383,14 @@ def build_packet(
         "review_questions": GOAL_QUESTIONS.get(goal, GOAL_QUESTIONS["billing_review"])[lang],
         "itemized_bill_checklist": ITEMIZED_CHECKLIST[lang],
         "eob_reconciliation_checklist": EOB_CHECKLIST[lang] if case.coverage_type not in ("uninsured", "unknown") else None,
-        "phone_script": PHONE_SCRIPT[lang].format(hospital=hospital_name, n_review=len(review_items)),
-        "written_request": WRITTEN_REQUEST[lang].format(hospital=hospital_name, n_review=len(review_items)),
+        "phone_script": PHONE_SCRIPT[lang].format(
+            hospital=hospital_name,
+            review_count=_review_count(len(review_items), lang),
+        ),
+        "written_request": WRITTEN_REQUEST[lang].format(
+            hospital=hospital_name,
+            review_count=_line_count(len(review_items), lang),
+        ),
         "placeholders": {
             "patient_name": "[Your name]" if lang == "en" else "[Su nombre]",
             "account_number": "[Account number]" if lang == "en" else "[Numero de cuenta]",

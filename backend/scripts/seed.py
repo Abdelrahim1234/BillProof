@@ -8,6 +8,7 @@ not stored in the repository; data/seed/provenance.json records their hashes and
 retrieval metadata instead. Synthetic parser fixtures are never loaded here.
 """
 
+import asyncio
 import csv
 import json
 import sys
@@ -17,12 +18,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from sqlalchemy import select
-
-from billproof.db import Base, SessionLocal, engine, init_db
+from billproof import store
 from billproof.enums import CareSetting, ChargeScope, ChargeType, CodeType
 from billproof.models import Facility, FacilitySource, PriceRecord, ServiceBundle
+from billproof.repositories import benchmarks as benchmarks_repo
+from billproof.repositories import hospitals as hospitals_repo
+from billproof.repositories import prices as prices_repo
 from billproof.services.code_normalizer import normalize_code, normalize_payer
+from billproof.services.privacy import strip_query
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SEED_DIR = REPO_ROOT / "data" / "seed"
@@ -52,45 +55,41 @@ VERIFIED_PRICE_COLUMNS = {
 }
 
 
-def seed_facilities(db) -> None:
+async def seed_facilities(db) -> None:
     hospitals = json.loads((SEED_DIR / "hospitals.json").read_text())
     for h in hospitals:
-        existing = db.scalar(select(Facility).where(Facility.name == h["name"]))
-        if existing:
+        if await hospitals_repo.get_facility_by_name(db, h["name"]):
             continue
-        db.add(
-            Facility(
-                facility_id=h.get("facility_id"),
-                organization_npi=h.get("organization_npi"),
-                name=h["name"],
-                facility_type=h["facility_type"],
-                address=h["address"],
-                city=h["city"],
-                state=h["state"],
-                zip_code=h["zip_code"],
-                hospital_type=h.get("hospital_type"),
-                ownership=h.get("ownership"),
-                phone=h.get("phone"),
-                latitude=h.get("latitude"),
-                longitude=h.get("longitude"),
-                financial_assistance_url=h.get("financial_assistance_url"),
-                billing_url=h.get("billing_url"),
-                public_price_url=h.get("public_price_url"),
-                verification_source=h.get("verification_source"),
-                verification_date=date.fromisoformat(h["verification_date"])
-                if h.get("verification_date")
-                else None,
-            )
+        facility = Facility(
+            facility_id=h.get("facility_id"),
+            organization_npi=h.get("organization_npi"),
+            name=h["name"],
+            facility_type=h["facility_type"],
+            address=h["address"],
+            city=h["city"],
+            state=h["state"],
+            zip_code=h["zip_code"],
+            hospital_type=h.get("hospital_type"),
+            ownership=h.get("ownership"),
+            phone=h.get("phone"),
+            latitude=h.get("latitude"),
+            longitude=h.get("longitude"),
+            financial_assistance_url=h.get("financial_assistance_url"),
+            billing_url=h.get("billing_url"),
+            public_price_url=h.get("public_price_url"),
+            verification_source=h.get("verification_source"),
+            verification_date=date.fromisoformat(h["verification_date"])
+            if h.get("verification_date")
+            else None,
         )
-    db.commit()
+        await hospitals_repo.upsert_facility(db, facility)
 
 
-def seed_urgent_care(db) -> None:
+async def seed_urgent_care(db) -> None:
     """Seed locations only; no unverified urgent-care prices are invented."""
     locations = json.loads((SEED_DIR / "urgent_care.json").read_text())
     for loc in locations:
-        existing = db.scalar(select(Facility).where(Facility.name == loc["name"]))
-        if existing:
+        if await hospitals_repo.get_facility_by_name(db, loc["name"]):
             continue
         facility = Facility(
             name=loc["name"],
@@ -108,58 +107,42 @@ def seed_urgent_care(db) -> None:
             if loc.get("verification_date")
             else None,
         )
-        db.add(facility)
-    db.commit()
+        await hospitals_repo.upsert_facility(db, facility)
 
 
-def seed_service_bundles(db) -> None:
+async def seed_service_bundles(db) -> None:
     codes = json.loads((SEED_DIR / "code_allowlist.json").read_text())
     for c in codes:
-        existing = db.scalar(
-            select(ServiceBundle).where(ServiceBundle.normalized_service_key == c["service_key"])
-        )
-        if existing:
-            existing.display_name = c["display_name"]
-            existing.code = c["code"]
-            existing.code_type = c["code_type"]
-            existing.setting = c["setting"]
+        existing = await benchmarks_repo.get_service_bundle_by_key(db, c["service_key"])
+        fields = {
+            "display_name": c["display_name"],
+            "normalized_service_key": c["service_key"],
+            "code": c["code"],
+            "code_type": c["code_type"],
+            "setting": c["setting"],
             # A service bundle describes a code/setting, not a billing entity.
             # The verified source rows do not publish billing class, so claiming
             # a facility scope here would make a match look more specific than
             # its evidence supports.
-            existing.charge_scope = "unknown"
-        else:
-            db.add(
-                ServiceBundle(
-                    display_name=c["display_name"],
-                    normalized_service_key=c["service_key"],
-                    code=c["code"],
-                    code_type=c["code_type"],
-                    setting=c["setting"],
-                    charge_scope="unknown",
-                )
-            )
-    db.commit()
+            "charge_scope": "unknown",
+        }
+        bundle = existing.model_copy(update=fields) if existing else ServiceBundle(**fields)
+        await benchmarks_repo.upsert_service_bundle(db, bundle)
 
 
-def remove_synthetic_seed_data(db) -> int:
+async def remove_synthetic_seed_data(db) -> int:
     """Remove legacy synthetic seed rows before loading the verified snapshot."""
-    synthetic_prices = list(db.scalars(select(PriceRecord).where(PriceRecord.is_synthetic.is_(True))))
+    synthetic_prices = await prices_repo.all_synthetic(db)
     for record in synthetic_prices:
-        db.delete(record)
-    stale_sources = list(
-        db.scalars(select(FacilitySource).where(FacilitySource.source_url.contains("example.invalid")))
-    )
-    for source in stale_sources:
-        db.delete(source)
-    db.commit()
+        await prices_repo.delete(db, record.id)
+    await hospitals_repo.delete_sources_matching_url_fragment(db, "example.invalid")
     return len(synthetic_prices)
 
 
 def _parse_utc(value: str) -> datetime:
     if not value.endswith("Z"):
         raise ValueError("Provenance retrieved_at must be an ISO-8601 UTC timestamp ending in Z")
-    return datetime.fromisoformat(value).replace(tzinfo=None)
+    return datetime.fromisoformat(value)
 
 
 def _load_provenance() -> dict[str, dict]:
@@ -255,7 +238,7 @@ def _validated_price_rows() -> tuple[list[dict], dict[str, dict]]:
     return rows, provenance
 
 
-def _price_values(row: dict, facility: Facility, source: dict) -> dict:
+def _price_fields(row: dict, facility: Facility, source: dict) -> dict:
     normalized = normalize_code(row["code"], row["code_type"])
     return {
         "hospital_id": facility.id,
@@ -276,14 +259,19 @@ def _price_values(row: dict, facility: Facility, source: dict) -> dict:
         "rate_method": row["rate_method"] or None,
         "allowed_count": int(row["allowed_count"]) if row["allowed_count"] else None,
         "mrf_date": date.fromisoformat(row["file_date"]),
-        "source_url": row["source_url"],
+        # Defense in depth: strip_query() again even though the checked-in CSV
+        # itself is now sanitized -- a future hand-edit of the CSV must not be
+        # able to reintroduce a signed retrieval URL into stored records.
+        "source_url": strip_query(row["source_url"]),
+        "citation_url": facility.public_price_url,
         "source_record_locator": row["source_record_locator"],
         "is_synthetic": False,
+        "source_type": CURATED_SOURCE_TYPE,
         "created_at": _parse_utc(source["retrieved_at"]),
     }
 
 
-def seed_verified_prices(db) -> int:
+async def seed_verified_prices(db) -> int:
     """Reconcile the authoritative curated snapshot and original-file provenance.
 
     Ownership is limited to sources registered with a curated source type. Rows
@@ -292,16 +280,10 @@ def seed_verified_prices(db) -> int:
     """
     rows, provenance = _validated_price_rows()
 
-    facilities = {
-        facility.name: facility
-        for facility in db.scalars(select(Facility).where(Facility.facility_type == "hospital"))
-    }
-    existing_curated_sources = list(
-        db.scalars(select(FacilitySource).where(FacilitySource.source_type.in_(CURATED_SOURCE_TYPES)))
-    )
-    owned_source_keys = {
-        (source.hospital_id, source.source_url) for source in existing_curated_sources
-    }
+    hospitals = await hospitals_repo.facilities_by_type(db, "hospital")
+    facilities = {f.name: f for f in hospitals}
+    existing_curated_sources = await hospitals_repo.sources_by_type(db, CURATED_SOURCE_TYPES)
+    owned_source_keys = {(s.hospital_id, s.source_url) for s in existing_curated_sources}
     sources_by_key: dict[tuple[str, str], list[FacilitySource]] = {}
     for source in existing_curated_sources:
         sources_by_key.setdefault((source.hospital_id, source.source_url), []).append(source)
@@ -311,97 +293,102 @@ def seed_verified_prices(db) -> int:
         facility = facilities.get(source["hospital_name"])
         if not facility:
             raise RuntimeError(f"No seeded facility named {source['hospital_name']!r}")
-        source_key = (facility.id, source["source_url"])
+        resolved_url = strip_query(source["source_url"])  # defense in depth -- see the note in _price_fields
+        source_key = (facility.id, resolved_url)
         desired_source_keys.add(source_key)
         owned_source_keys.add(source_key)
         matches = sources_by_key.get(source_key, [])
-        existing_source = matches[0] if matches else None
-        if existing_source is None:
-            existing_source = FacilitySource(hospital_id=facility.id, source_url=source["source_url"])
-            db.add(existing_source)
-        existing_source.source_type = source["source_type"]
-        existing_source.schema_version = source["schema_version"]
-        existing_source.file_date = date.fromisoformat(source["file_date"])
-        existing_source.retrieved_at = _parse_utc(source["retrieved_at"])
-        existing_source.sha256 = source["sha256"]
-        existing_source.active = True
+        existing_source = matches[0] if matches else FacilitySource(
+            hospital_id=facility.id, source_url=resolved_url, source_type=source["source_type"], sha256=""
+        )
+        existing_source = existing_source.model_copy(
+            update={
+                "source_type": source["source_type"],
+                "source_url": resolved_url,
+                "citation_url": facility.public_price_url,
+                "schema_version": source["schema_version"],
+                "file_date": date.fromisoformat(source["file_date"]),
+                "retrieved_at": _parse_utc(source["retrieved_at"]),
+                "sha256": source["sha256"],
+                "active": True,
+            }
+        )
+        await hospitals_repo.upsert_facility_source(db, existing_source)
         for duplicate in matches[1:]:
-            db.delete(duplicate)
+            await db["hospital_sources"].delete_one({"_id": duplicate.id})
 
     for source_key, matches in sources_by_key.items():
         if source_key not in desired_source_keys:
             for stale_source in matches:
-                stale_source.active = False
+                await hospitals_repo.upsert_facility_source(db, stale_source.model_copy(update={"active": False}))
 
     desired_prices: dict[tuple[str, str, str, str], tuple[dict, Facility, dict]] = {}
     for row in rows:
         facility = facilities[row["hospital_name"]]
-        key = (
-            facility.id,
-            row["source_url"],
-            row["source_record_locator"],
-            row["charge_type"],
-        )
+        key = (facility.id, row["source_url"], row["source_record_locator"], row["charge_type"])
         desired_prices[key] = (row, facility, provenance[row["source_id"]])
 
+    # A separate bulk/bounded ingestion (scripts/ingest_mrf.py, run directly,
+    # not through this curated CSV) can legitimately reuse the exact same
+    # source file/URL as this curated snapshot -- e.g. more codes pulled from
+    # the same LewisGale MRF, matched to the same FacilitySource by sha256.
+    # So (hospital_id, source_url) alone can't tell curated and bulk rows
+    # apart. Ownership is decided by each PriceRecord's own source_type tag
+    # instead (see PriceRecord.source_type, set by _price_fields above and by
+    # ingest_mrf.py's own record construction). Rows written before this tag
+    # existed have source_type=None; the owned_source_keys fallback there is
+    # a one-time bridge that adopts them into `source_type` on this run, and
+    # is dead weight afterwards. Reconciliation must only ever prune rows
+    # actually PART OF this curated set -- otherwise a later `seed.py` run
+    # silently deletes real, separately-ingested data (found the hard way:
+    # this deleted 800+ bounded-re-ingestion rows on a routine reseed).
+    non_synthetic_prices = await prices_repo.all_non_synthetic(db)
     existing_prices_by_key: dict[tuple[str, str, str, str], list[PriceRecord]] = {}
-    non_synthetic_prices = db.scalars(
-        select(PriceRecord).where(PriceRecord.is_synthetic.is_(False))
-    )
     for price in non_synthetic_prices:
-        if (price.hospital_id, price.source_url) not in owned_source_keys:
-            continue
-        key = (
-            price.hospital_id,
-            price.source_url,
-            price.source_record_locator or "",
-            price.charge_type,
+        is_curated = price.source_type in CURATED_SOURCE_TYPES or (
+            price.source_type is None and (price.hospital_id, price.source_url) in owned_source_keys
         )
+        if not is_curated:
+            continue
+        key = (price.hospital_id, price.source_url, price.source_record_locator or "", price.charge_type)
         existing_prices_by_key.setdefault(key, []).append(price)
 
     for key, (row, facility, source) in desired_prices.items():
         matches = existing_prices_by_key.pop(key, [])
-        price = matches[0] if matches else PriceRecord()
-        for field, value in _price_values(row, facility, source).items():
-            setattr(price, field, value)
-        if not matches:
-            db.add(price)
+        fields = _price_fields(row, facility, source)
+        price = (matches[0].model_copy(update=fields)) if matches else PriceRecord(**fields)
+        await prices_repo.upsert(db, price)
         for duplicate in matches[1:]:
-            db.delete(duplicate)
+            await prices_repo.delete(db, duplicate.id)
 
     for stale_prices in existing_prices_by_key.values():
         for stale_price in stale_prices:
-            db.delete(stale_price)
+            await prices_repo.delete(db, stale_price.id)
 
-    db.commit()
     return len(rows)
 
 
-def main() -> None:
-    Base.metadata.create_all(bind=engine)
-    init_db()
-    db = SessionLocal()
-    try:
-        seed_facilities(db)
-        seed_urgent_care(db)
-        seed_service_bundles(db)
+async def main() -> None:
+    await store.connect()
+    db = store.get_public_db()
 
-        removed_synthetic_rows = remove_synthetic_seed_data(db)
-        verified_rows = seed_verified_prices(db)
-        remaining_synthetic_rows = list(
-            db.scalars(select(PriceRecord.id).where(PriceRecord.is_synthetic.is_(True)))
-        )
-        if remaining_synthetic_rows:
-            raise RuntimeError("Synthetic price rows remain after verified seeding")
+    await seed_facilities(db)
+    await seed_urgent_care(db)
+    await seed_service_bundles(db)
 
-        print(f"Seeded facilities and {len(json.loads((SEED_DIR / 'code_allowlist.json').read_text()))} service bundles.")
-        print(f"Loaded {verified_rows} verified price rows from {len(_load_provenance())} official MRFs.")
-        if removed_synthetic_rows:
-            print(f"Removed {removed_synthetic_rows} legacy synthetic price rows.")
-        print(f"Synthetic price rows in database: {len(remaining_synthetic_rows)}.")
-    finally:
-        db.close()
+    removed_synthetic_rows = await remove_synthetic_seed_data(db)
+    verified_rows = await seed_verified_prices(db)
+    remaining_synthetic = await prices_repo.all_synthetic(db)
+    if remaining_synthetic:
+        raise RuntimeError("Synthetic price rows remain after verified seeding")
+
+    print(f"Seeded facilities and {len(json.loads((SEED_DIR / 'code_allowlist.json').read_text()))} service bundles.")
+    print(f"Loaded {verified_rows} verified price rows from {len(_load_provenance())} official MRFs.")
+    if removed_synthetic_rows:
+        print(f"Removed {removed_synthetic_rows} legacy synthetic price rows.")
+    print(f"Synthetic price rows in database: {len(remaining_synthetic)}.")
+    await store.close()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

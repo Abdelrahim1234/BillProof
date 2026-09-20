@@ -21,7 +21,7 @@ const serif = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "BillProof",
+  title: "BillBuster",
   description:
     "Compare a hospital bill against the hospital's own published prices, with a source for every number.",
 };

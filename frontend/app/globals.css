@@ -106,6 +106,16 @@ a {
   text-align: center;
 }
 
+.single-action {
+  margin-top: 0.6rem;
+}
+
+.single-action button {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
 .muted {
   color: var(--ink-soft);
 }
@@ -610,6 +620,37 @@ pre.script {
   color: var(--ink-soft);
 }
 
+.stage-url {
+  max-width: min(32rem, 82vw);
+  margin: 0.85rem auto 0;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.copy-demo-link {
+  margin-top: 0.6rem;
+  min-height: 40px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+.demo-status {
+  margin: 0.85rem auto 0;
+  max-width: 34rem;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.demo-status.ready span {
+  color: var(--accent);
+}
+
+.demo-status.error {
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .wall {
   max-width: min(94rem, 94vw);
   margin: 0 auto;
@@ -653,6 +694,12 @@ pre.script {
   margin-top: 0.5rem;
   font-size: 0.82rem;
   letter-spacing: 0.02em;
+}
+
+.wall-scan .demo-status {
+  max-width: 17rem;
+  margin-top: 0.55rem;
+  text-align: left;
 }
 
 /* Presenter-only control: legible up close, invisible from the back row. */

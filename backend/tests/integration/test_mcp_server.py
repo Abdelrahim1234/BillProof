@@ -4,9 +4,9 @@ from pathlib import Path
 
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from billproof.db import SessionLocal
+from billproof import store
 from billproof.mcp_server import mcp
-from billproof.models import Facility
+from billproof.repositories import hospitals as hospitals_repo
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -22,13 +22,9 @@ def _run_seed():
     assert result.returncode == 0, result.stderr
 
 
-def _lewisgale_id() -> str:
-    db = SessionLocal()
-    try:
-        f = db.query(Facility).filter_by(name="LewisGale Hospital Montgomery").one()
-        return f.id
-    finally:
-        db.close()
+async def _lewisgale_id() -> str:
+    facility = await hospitals_repo.get_facility_by_name(store.get_public_db(), "LewisGale Hospital Montgomery")
+    return facility.id
 
 
 async def test_handshake_and_list_tools():
@@ -58,7 +54,7 @@ async def test_handshake_and_list_tools():
 
 async def test_proofmap_tools_find_and_explain(client):
     _run_seed()
-    hospital_id = _lewisgale_id()
+    hospital_id = await _lewisgale_id()
 
     async with create_connected_server_and_client_session(mcp._mcp_server) as session:
         await session.initialize()
@@ -66,7 +62,7 @@ async def test_proofmap_tools_find_and_explain(client):
             "find_nearby_facilities", {"lat": 37.2001, "lng": -80.4181, "radius_miles": 25}
         )
         assert nearby.isError is not True
-        assert len(nearby.structuredContent["data"]) == 5
+        assert len(nearby.structuredContent["data"]) == 2
 
         landscape = await session.call_tool(
             "get_local_price_landscape",
@@ -123,7 +119,7 @@ async def test_find_hospital_and_lookup_prices_return_typed_content():
 
 async def test_compare_bill_line_matches_rest_result(client):
     _run_seed()
-    hospital_id = _lewisgale_id()
+    hospital_id = await _lewisgale_id()
 
     case = client.post(
         "/api/v1/cases",
@@ -218,6 +214,7 @@ async def test_methodology_resource_and_prompt():
 
         prompt = await session.get_prompt(
             "prepare_hospital_call",
-            {"case_id": "c1", "access_token": "t1", "language": "en", "goal": "billing_review"},
+            {"case_id": "c1", "language": "en", "goal": "billing_review"},
         )
         assert "analyze_case" in prompt.messages[0].content.text
+        assert "access_token=" not in prompt.messages[0].content.text

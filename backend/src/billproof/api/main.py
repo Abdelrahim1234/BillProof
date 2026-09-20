@@ -6,8 +6,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from billproof import store
 from billproof.config import get_settings
-from billproof.db import init_db
 from billproof.errors import AppError, get_request_id, set_request_id
 from billproof.logging_config import configure_logging
 
@@ -16,11 +16,17 @@ configure_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
-    yield
+    await store.connect()
+    try:
+        # Safe and idempotent for both adapters. Hosted Mongo deployments
+        # should never begin serving before their query/retention indexes exist.
+        await store.init_indexes()
+        yield
+    finally:
+        await store.close()
 
 
-app = FastAPI(title="BillProof API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="BillBuster API", version="0.1.0", lifespan=lifespan)
 
 settings = get_settings()
 app.add_middleware(
@@ -37,10 +43,6 @@ async def assign_request_id(request: Request, call_next):
     set_request_id(uuid.uuid4().hex)
     response = await call_next(request)
     response.headers["X-Request-Id"] = get_request_id()
-    # Every response here is per-case or live state. A CDN in front of this API
-    # (Vercel's, in the hosted setup) will otherwise serve a stale bill to the
-    # presentation screen, or replay a bill that was just cleared.
-    response.headers["Cache-Control"] = "no-store"
     return response
 
 
@@ -67,6 +69,7 @@ from billproof.api.routes import (
     analysis,
     bills,
     cases,
+    explain,
     health,
     hospitals,
     packets,
@@ -84,4 +87,5 @@ app.include_router(analysis.router)
 app.include_router(activity.router)
 app.include_router(packets.router)
 app.include_router(map_routes.router)
+app.include_router(explain.router)
 app.include_router(screens.router)

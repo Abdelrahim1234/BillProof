@@ -1,0 +1,31 @@
+{
+  "_notice": "Synthetic fixture. Not a real patient bill.",
+  "title": "Insured, but the EOB hasn't arrived",
+  "blurb": "The app refuses to compare what you owe against a negotiated rate, and asks for the EOB instead.",
+  "hospital_name": "LewisGale Hospital Montgomery",
+  "coverage_type": "commercial",
+  "payer_name": "Anthem",
+  "plan_name": "Blue Preferred",
+  "care_setting": "outpatient",
+  "service_month": "2026-08",
+  "lines": [
+    {
+      "code": "74177",
+      "code_type": "CPT",
+      "description": "CT abdomen and pelvis with contrast",
+      "care_setting": "outpatient",
+      "units": "1",
+      "billed_amount": "7056.00",
+      "patient_responsibility": "1411.20"
+    },
+    {
+      "code": "80053",
+      "code_type": "CPT",
+      "description": "Comprehensive metabolic panel",
+      "care_setting": "outpatient",
+      "units": "1",
+      "billed_amount": "860.00",
+      "patient_responsibility": "172.00"
+    }
+  ]
+}

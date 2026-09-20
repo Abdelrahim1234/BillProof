@@ -1,0 +1,22 @@
+{
+  "_notice": "Synthetic fixture. Not a real patient bill.",
+  "title": "CT scan, no insurance",
+  "blurb": "One imaging line billed at the sticker price, next to the published self-pay price.",
+  "hospital_name": "Carilion New River Valley Medical Center",
+  "coverage_type": "uninsured",
+  "payer_name": null,
+  "plan_name": null,
+  "care_setting": "outpatient",
+  "service_month": "2026-07",
+  "lines": [
+    {
+      "code": "74177",
+      "code_type": "CPT",
+      "description": "CT abdomen and pelvis with contrast",
+      "care_setting": "outpatient",
+      "units": "1",
+      "billed_amount": "4406.00",
+      "patient_responsibility": "4406.00"
+    }
+  ]
+}

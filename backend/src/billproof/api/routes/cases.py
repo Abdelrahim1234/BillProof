@@ -1,22 +1,18 @@
-import json
-from pathlib import Path
-
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from billproof.api.dependencies import get_current_case
 from billproof.db import get_db
 from billproof.errors import forbidden, not_found, ok
-from billproof.models import BillLine, Case
+from billproof.models import Case
 from billproof.repositories import cases as cases_repo
 from billproof.repositories import hospitals as hospitals_repo
 from billproof.schemas.cases import CaseCreate, CaseCreated, CaseOut
-from billproof.services import activity
+from billproof.services import activity, demo_samples
 from billproof.services.case_lifecycle import purge_case
 
 router = APIRouter(prefix="/api/v1", tags=["cases"])
-
-FIXTURE_DIR = Path(__file__).resolve().parents[4] / "data" / "fixtures"
 
 
 def _require_matching_case(case_id: str, current: Case) -> None:
@@ -34,48 +30,24 @@ def create_case(payload: CaseCreate, db: Session = Depends(get_db)):
     )
 
 
+class DemoCaseRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    sample: str = demo_samples.DEFAULT_SAMPLE_ID
+
+
+@router.get("/demo/samples")
+def list_demo_samples():
+    """The sample bills the start screen offers. All synthetic, all offline."""
+    return ok(demo_samples.catalogue())
+
+
 @router.post("/demo/cases", status_code=201)
-def create_demo_case(db: Session = Depends(get_db)):
-    """Clones the stable synthetic demo fixture into a fresh case. Must work
-    fully offline (docs/04) -- everything here reads local fixtures only."""
-    expected = json.loads((FIXTURE_DIR / "demo_bill_expected.json").read_text())
-    facility = next(
-        (f for f in hospitals_repo.search_facilities(db, name=expected["hospital_name"], limit=1)), None
-    )
-    if not facility:
-        raise not_found("Demo hospital (run scripts/seed.py first)")
-
-    payload = CaseCreate(
-        hospital_id=facility.id,
-        coverage_type=expected["coverage_type"],
-        payer_name=expected["payer_name"],
-        plan_name=expected["plan_name"],
-        care_setting="outpatient",
-        service_month=expected.get("service_month"),
-        language="en",
-    )
-    case, token = cases_repo.create_case(db, payload)
-
-    for line in expected["lines"]:
-        db.add(
-            BillLine(
-                case_id=case.id,
-                code_raw=line["code"],
-                code=line["code"],
-                code_type=line["code_type"],
-                description=line["description"],
-                units=line["units"],
-                billed_amount=line.get("billed_amount"),
-                allowed_amount=line.get("allowed_amount"),
-                patient_responsibility=line.get("patient_responsibility"),
-                care_setting=line["care_setting"],
-                charge_scope=line.get("charge_scope", "unknown"),
-                extraction_confidence="high",
-                needs_manual_review=False,
-                confirmed=True,
-            )
-        )
-    db.commit()
+def create_demo_case(payload: DemoCaseRequest | None = None, db: Session = Depends(get_db)):
+    """Clones a synthetic sample bill into a fresh case. Must work fully offline
+    (docs/04) -- everything here reads local fixtures only."""
+    sample_id = (payload or DemoCaseRequest()).sample
+    case, token, body = demo_samples.create_case_from_sample(db, sample_id)
 
     activity.record(
         db,
@@ -84,7 +56,7 @@ def create_demo_case(db: Session = Depends(get_db)):
         tool_name="create_demo_case",
         display_name="Demo case created",
         status="success",
-        summary=f"Loaded {len(expected['lines'])} synthetic demo bill line items.",
+        summary=f"Loaded {len(body['lines'])} synthetic demo bill line items.",
     )
 
     return ok(
@@ -93,6 +65,8 @@ def create_demo_case(db: Session = Depends(get_db)):
             "access_token": token,
             "expires_at": case.expires_at.isoformat(),
             "is_demo": True,
+            "sample": sample_id,
+            "title": body.get("title", "Example bill"),
         }
     )
 

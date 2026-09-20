@@ -1,0 +1,31 @@
+{
+  "_notice": "Synthetic fixture. Not a real patient bill.",
+  "title": "A bill we cannot price",
+  "blurb": "No published price exists for these codes, so the app says so instead of guessing.",
+  "hospital_name": "LewisGale Hospital Montgomery",
+  "coverage_type": "uninsured",
+  "payer_name": null,
+  "plan_name": null,
+  "care_setting": "inpatient",
+  "service_month": "2026-05",
+  "lines": [
+    {
+      "code": "27447",
+      "code_type": "CPT",
+      "description": "Total knee replacement",
+      "care_setting": "inpatient",
+      "units": "1",
+      "billed_amount": "28500.00",
+      "patient_responsibility": "6200.00"
+    },
+    {
+      "code": "0202",
+      "code_type": "REVENUE",
+      "description": "Intensive care room and board",
+      "care_setting": "inpatient",
+      "units": "2",
+      "billed_amount": "9800.00",
+      "patient_responsibility": "2100.00"
+    }
+  ]
+}

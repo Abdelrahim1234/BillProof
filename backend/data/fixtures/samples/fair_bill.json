@@ -1,0 +1,31 @@
+{
+  "_notice": "Synthetic fixture. Not a real patient bill.",
+  "title": "A bill that looks reasonable",
+  "blurb": "Not every bill has a gap. This one lands at or below the published price.",
+  "hospital_name": "LewisGale Hospital Montgomery",
+  "coverage_type": "uninsured",
+  "payer_name": null,
+  "plan_name": null,
+  "care_setting": "outpatient",
+  "service_month": "2026-08",
+  "lines": [
+    {
+      "code": "71046",
+      "code_type": "CPT",
+      "description": "Chest X-ray, 2 views",
+      "care_setting": "outpatient",
+      "units": "1",
+      "billed_amount": "1100.00",
+      "patient_responsibility": "1100.00"
+    },
+    {
+      "code": "80053",
+      "code_type": "CPT",
+      "description": "Comprehensive metabolic panel",
+      "care_setting": "outpatient",
+      "units": "1",
+      "billed_amount": "690.00",
+      "patient_responsibility": "690.00"
+    }
+  ]
+}

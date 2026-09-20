@@ -1,0 +1,31 @@
+{
+  "_notice": "Synthetic fixture. Not a real patient bill.",
+  "title": "The same ER visit, the other hospital",
+  "blurb": "Level 4 ER care across town. Compare this published price to the LewisGale example.",
+  "hospital_name": "Carilion New River Valley Medical Center",
+  "coverage_type": "uninsured",
+  "payer_name": null,
+  "plan_name": null,
+  "care_setting": "emergency",
+  "service_month": "2026-08",
+  "lines": [
+    {
+      "code": "99284",
+      "code_type": "CPT",
+      "description": "Emergency department visit, level 4",
+      "care_setting": "emergency",
+      "units": "1",
+      "billed_amount": "2178.00",
+      "patient_responsibility": "2178.00"
+    },
+    {
+      "code": "80053",
+      "code_type": "CPT",
+      "description": "Comprehensive metabolic panel",
+      "care_setting": "emergency",
+      "units": "1",
+      "billed_amount": "487.00",
+      "patient_responsibility": "487.00"
+    }
+  ]
+}

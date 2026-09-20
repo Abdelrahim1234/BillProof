@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
-// Self-hosted so a rebuild works with no internet — the venue Wi-Fi is not a
+// Self-hosted so a rebuild works with no internet. The venue Wi-Fi is not a
 // dependency of `./demo.sh`.
 const sans = localFont({
   src: "./fonts/PublicSans.woff2",

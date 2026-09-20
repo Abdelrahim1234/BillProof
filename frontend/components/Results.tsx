@@ -2,6 +2,7 @@
 
 import type { Analysis, BillLineOut, Facility, LineComparison, SourceCitation } from "@/lib/api";
 import { formatMoney } from "@/lib/api";
+import { PairedBars } from "@/components/Bars";
 import {
   BASIS_LABELS,
   CONFIDENCE_LABELS,
@@ -47,9 +48,12 @@ export type DisplayLine = { id: string; code: string | null; description: string
 export function LineCard({
   line,
   comparison,
+  scale,
 }: {
   line: DisplayLine | undefined;
   comparison: LineComparison;
+  /** Shared axis maximum. When given, the two amounts are drawn as bars. */
+  scale?: number;
 }) {
   const title = line?.description || (line?.code ? `Code ${line.code}` : "Bill line");
   const showCodeSuffix = Boolean(line?.code && line?.description);
@@ -80,28 +84,41 @@ export function LineCard({
         <p className="small muted">{comparison.warnings[0] ?? NO_COMPARISON_POSTURE}</p>
       ) : (
         <>
-          <div className="compare-grid">
-            <div className="compare-cell">
-              <div className="key">
-                {subject ? SUBJECT_LABELS[subject.type]?.label ?? subject.type : "On the bill"}
+          {/* On a shared axis the two amounts read as bars; on a phone, where
+              there is no axis to share, they stay as figures with their
+              definitions. */}
+          {scale && subject && benchmark?.median ? (
+            <PairedBars
+              charged={subject.money}
+              published={benchmark.median}
+              scale={scale}
+              chargedLabel={SUBJECT_LABELS[subject.type]?.short ?? subject.type}
+              publishedLabel={basis?.short ?? "Published"}
+            />
+          ) : (
+            <div className="compare-grid">
+              <div className="compare-cell">
+                <div className="key">
+                  {subject ? SUBJECT_LABELS[subject.type]?.label ?? subject.type : "On the bill"}
+                </div>
+                <div className="amount">{subject ? formatMoney(subject.money) : "n/a"}</div>
+                <div className="gloss">
+                  {subject ? SUBJECT_LABELS[subject.type]?.definition : "No comparable amount on this line."}
+                </div>
               </div>
-              <div className="amount">{subject ? formatMoney(subject.money) : "—"}</div>
-              <div className="gloss">
-                {subject ? SUBJECT_LABELS[subject.type]?.definition : "No comparable amount on this line."}
+              <div className="compare-cell">
+                <div className="key">{basis?.label ?? benchmark?.basis ?? "No published price"}</div>
+                <div className="amount">
+                  {benchmark
+                    ? contextOnly && benchmark.low && benchmark.high && benchmark.low.amount_cents !== benchmark.high.amount_cents
+                      ? `${formatMoney(benchmark.low)} to ${formatMoney(benchmark.high)}`
+                      : formatMoney(benchmark.median)
+                    : "n/a"}
+                </div>
+                <div className="gloss">{basis?.definition ?? ""}</div>
               </div>
             </div>
-            <div className="compare-cell">
-              <div className="key">{basis?.label ?? benchmark?.basis ?? "No published price"}</div>
-              <div className="amount">
-                {benchmark
-                  ? contextOnly && benchmark.low && benchmark.high && benchmark.low.amount_cents !== benchmark.high.amount_cents
-                    ? `${formatMoney(benchmark.low)} – ${formatMoney(benchmark.high)}`
-                    : formatMoney(benchmark.median)
-                  : "—"}
-              </div>
-              <div className="gloss">{basis?.definition ?? ""}</div>
-            </div>
-          </div>
+          )}
 
           {diffCents === 0 && (
             <p className="delta">
@@ -248,7 +265,7 @@ export default function Results({
       <h2>What to do with this</h2>
       <button type="button" className="primary choice" onClick={onBuildPacket} disabled={busy}>
         <span className="title">{busy ? "Preparing…" : "Build my negotiation packet"}</span>
-        <span className="sub">Phone script, written request, evidence table — from the numbers above.</span>
+        <span className="sub">Phone script, written request and evidence table, from the numbers above.</span>
       </button>
 
       {facility && (

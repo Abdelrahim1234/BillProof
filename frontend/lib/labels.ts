@@ -40,54 +40,65 @@ export const GOAL_OPTIONS = [
 ];
 
 /** What the bill amount we compared actually is, defined inline. */
-export const SUBJECT_LABELS: Record<string, { label: string; definition: string }> = {
+export const SUBJECT_LABELS: Record<string, { label: string; short: string; definition: string }> = {
   allowed_amount: {
     label: "Allowed amount",
+    short: "Allowed",
     definition: "The total your plan recognized for this service, before your share was worked out.",
   },
   billed_amount: {
     label: "Billed amount",
+    short: "Billed",
     definition: "The hospital's sticker price for this line, before any discount or plan adjustment.",
   },
   patient_responsibility: {
     label: "Your responsibility",
+    short: "You owe",
     definition: "The part of this line the bill says you owe.",
   },
 };
 
 /** What the public number we compared against actually is. */
-export const BASIS_LABELS: Record<string, { label: string; definition: string }> = {
+export const BASIS_LABELS: Record<string, { label: string; short: string; definition: string }> = {
   payer_negotiated_rate: {
     label: "Your plan's disclosed negotiated rate",
+    short: "Plan's rate",
     definition: "The price this hospital publicly discloses for your insurance plan for this code.",
   },
   hospital_discounted_cash: {
     label: "This hospital's disclosed cash price",
+    short: "Cash price",
     definition: "The self-pay price this hospital publishes for this code.",
   },
   peer_discounted_cash: {
     label: "Another local hospital's disclosed cash price",
+    short: "Peer cash price",
     definition: "This hospital publishes no cash price for this code, so a nearby hospital's is shown.",
   },
   hospital_allowed_median: {
     label: "This hospital's de-identified allowed-amount median",
+    short: "Allowed median",
     definition: "A published aggregate of allowed amounts at this hospital, not a single claim.",
   },
   peer_payer_negotiated_rate: {
     label: "Another local hospital's disclosed negotiated rate",
+    short: "Peer rate",
     definition: "Your hospital publishes no negotiated rate for this code, so a nearby hospital's is shown.",
   },
   hospital_discounted_cash_anchor: {
     label: "This hospital's disclosed cash price (context only)",
+    short: "Cash price",
     definition:
       "A cash price is not the same kind of number as an insured allowed amount. It is a talking point, not a like-for-like comparison.",
   },
   hospital_deidentified_range_context: {
     label: "De-identified allowed-amount range (context only)",
+    short: "Allowed range",
     definition: "A published low-to-high range. There is no single correct point inside it.",
   },
   medicare_ffs_hospital_aggregate: {
     label: "Medicare average payment at this hospital",
+    short: "Medicare average",
     definition: "A CMS average for this hospital and code. Medicare rates are not commercial rates.",
   },
 };

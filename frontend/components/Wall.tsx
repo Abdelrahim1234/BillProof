@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, formatMoney, type ScreenSubmission } from "@/lib/api";
 import { LineCard } from "@/components/Results";
+import { BarsLegend, PairedBars, scaleFor } from "@/components/Bars";
 
 const POLL_MS = 3000;
 
@@ -16,6 +17,20 @@ function reviewTotal(submission: ScreenSubmission): number {
     (sum, c) => sum + Math.max(0, c.difference?.amount_cents ?? 0),
     0,
   );
+}
+
+/** Totals across the lines that actually have a published price to compare. */
+function comparedTotals(submission: ScreenSubmission) {
+  let charged = 0;
+  let published = 0;
+  for (const c of submission.analysis.line_comparisons) {
+    const subject = c.comparison_subject?.money.amount_cents;
+    const benchmark = c.benchmark?.median?.amount_cents;
+    if (c.review_score === null || subject === undefined || benchmark === undefined) continue;
+    charged += subject;
+    published += benchmark;
+  }
+  return { charged, published };
 }
 
 export default function Wall({ svg, roomCode }: { svg: string; roomCode: string }) {
@@ -60,14 +75,16 @@ export default function Wall({ svg, roomCode }: { svg: string; roomCode: string 
   if (!submission) {
     return (
       <div className="stage">
-        <div>
+        <div className="stage-copy">
           <h1>What does this hospital actually charge?</h1>
           <p className="lede">
-            Scan with your phone. Send a bill — ours or yours — and the comparison appears here,
-            with the source for every number.
+            Scan with your phone. Send a bill, ours or yours, and the comparison appears here with
+            the source for every number.
           </p>
-          <Qr svg={svg} />
           <p className="qr-caption">No app, no account, no name asked for.</p>
+        </div>
+        <div className="stage-scan">
+          <Qr svg={svg} />
         </div>
       </div>
     );
@@ -77,9 +94,12 @@ export default function Wall({ svg, roomCode }: { svg: string; roomCode: string 
   const byId = new Map(lines.map((l) => [l.id, l]));
   const scored = analysis.line_comparisons.filter((c) => c.review_score !== null).length;
   const total = reviewTotal(submission);
+  const totals = comparedTotals(submission);
+  // One axis for every bar on screen, so lengths compare line to line.
+  const scale = scaleFor(analysis.line_comparisons);
 
   return (
-    <div className="wall">
+    <div className="wall wall-enter" key={submission.submission_id}>
       <header className="wall-head">
         <div>
           <h1>
@@ -102,15 +122,31 @@ export default function Wall({ svg, roomCode }: { svg: string; roomCode: string 
       </header>
 
       {total > 0 && (
-        <div className="wall-total">
-          <span className="figure">{formatMoney({ amount_cents: total, currency: "USD" })}</span>
-          <span className="caption">worth asking about — a difference to raise, not proof of an error</span>
-        </div>
+        <>
+          <div className="wall-total">
+            <span className="figure">{formatMoney({ amount_cents: total, currency: "USD" })}</span>
+            <span className="caption">
+              worth asking about. A difference to raise, not proof of an error.
+            </span>
+          </div>
+
+          <div className="wall-summary">
+            <PairedBars
+              charged={{ amount_cents: totals.charged, currency: "USD" }}
+              published={{ amount_cents: totals.published, currency: "USD" }}
+              scale={Math.max(totals.charged, totals.published)}
+              chargedLabel="This bill"
+              publishedLabel="Published"
+            />
+          </div>
+        </>
       )}
 
-      <div className="wall-lines">
+      <BarsLegend />
+
+      <div className="wall-lines" key={submission.submission_id}>
         {analysis.line_comparisons.map((c) => (
-          <LineCard key={c.line_id} line={byId.get(c.line_id)} comparison={c} />
+          <LineCard key={c.line_id} line={byId.get(c.line_id)} comparison={c} scale={scale} />
         ))}
       </div>
     </div>

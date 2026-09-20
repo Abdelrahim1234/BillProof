@@ -86,6 +86,26 @@ a {
   margin-bottom: 1.75rem;
 }
 
+.eyebrow {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 0.35rem;
+}
+
+.two-up {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.two-up button {
+  text-align: center;
+}
+
 .muted {
   color: var(--ink-soft);
 }
@@ -488,7 +508,7 @@ pre.script {
 }
 
 .fineprint {
-  margin-top: 2.5rem;
+  margin-top: 3rem;
   padding-top: 1rem;
   border-top: 1px solid var(--rule);
   font-size: 0.82rem;
@@ -509,24 +529,62 @@ pre.script {
 
 /* --- Presentation screen ------------------------------------------------ */
 
+/* A projector, not a phone: the idle screen spreads across the display and the
+   QR is sized to be scanned from the back of a room. The stacked, centred
+   version below is for anyone who opens this page on a laptop or a phone. */
 .stage {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 3rem 2rem;
+  align-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
   text-align: center;
 }
 
+.stage-copy,
+.stage-scan {
+  grid-column: 1;
+}
+
+.stage-copy {
+  background: rgba(251, 250, 247, 0.78);
+  border-radius: 12px;
+  padding: 1.5rem clamp(1.25rem, 4vw, 3rem);
+}
+
+/* A photograph of a hospital exterior, washed back so it reads as atmosphere
+   rather than as a claim about any particular facility: nothing on this screen
+   names it, and no bill is on screen while it shows. The QR keeps its own
+   opaque card, so scanning never depends on what sits behind it.
+   Photo: Greg Rosenke via Unsplash (Unsplash License: commercial use, no
+   attribution required). */
+.stage {
+  background-image:
+    linear-gradient(rgba(251, 250, 247, 0.78), rgba(251, 250, 247, 0.68)),
+    url("/hospital.jpg");
+  background-size: cover;
+  background-position: center 38%;
+  background-repeat: no-repeat;
+}
+
+@media (min-width: 62rem) {
+  .stage {
+    gap: 1.75rem;
+    padding: 3rem clamp(2rem, 6vw, 6rem);
+  }
+}
+
 .stage h1 {
-  font-size: clamp(2rem, 4.2vw, 3.4rem);
-  max-width: 18ch;
-  margin: 0 auto 0.75rem;
+  font-size: clamp(1.9rem, 4.6vw, 4.4rem);
+  max-width: 20ch;
+  margin: 0 auto 0.6rem;
 }
 
 .stage .lede {
-  font-size: clamp(1rem, 1.5vw, 1.25rem);
-  max-width: 44ch;
-  margin: 0 auto 2.5rem;
+  font-size: clamp(1rem, 1.5vw, 1.55rem);
+  max-width: 40ch;
+  margin: 0 auto 1.25rem;
 }
 
 .qr {
@@ -540,18 +598,20 @@ pre.script {
 
 .qr svg {
   display: block;
-  width: min(46vh, 20rem);
+  /* Bounded by the viewport on both axes so it never overflows a narrow
+     screen, and by a max so it stops growing on a very large display. */
+  width: min(42vh, 28rem, 74vw);
   height: auto;
 }
 
 .qr-caption {
-  margin: 1rem 0 0;
+  margin: 0.85rem 0 0;
   font-size: 0.95rem;
   color: var(--ink-soft);
 }
 
 .wall {
-  max-width: 82rem;
+  max-width: min(94rem, 94vw);
   margin: 0 auto;
   padding: 2rem 2.5rem 2.5rem;
 }
@@ -663,9 +723,122 @@ pre.script {
   display: none;
 }
 
+.wall-enter {
+  animation: rise 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* --- Paired bars (see components/Bars.tsx) ------------------------------ */
+
+.bars {
+  margin: 0.75rem 0 0.9rem;
+  display: grid;
+  /* 2px between adjacent fills, per the mark spec. */
+  gap: 2px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.bar-key {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+.bar-track {
+  background: var(--sunken);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 18px;
+  /* Anchored at the baseline, rounded only at the data end. */
+  border-radius: 0 4px 4px 0;
+  /* Decelerating, so a bar runs out quickly and then eases onto its value
+     rather than arriving at a constant speed. Long enough to read as growth
+     from across a room. */
+  transition: width 1400ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.bar-value {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 5.5rem;
+}
+
+.bars-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: 0 0 1.25rem;
+}
+
+.bars-legend .swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.bars-legend .swatch:not(:first-child) {
+  margin-left: 0.85rem;
+}
+
+/* On the wall the bars carry the comparison, so they run taller and the
+   numbers grow with them. */
+.wall .bar-fill {
+  height: 26px;
+}
+
+.wall .bar-value {
+  font-size: clamp(1.15rem, 1.7vw, 1.5rem);
+  min-width: 6.5rem;
+}
+
+.wall .bar-row {
+  grid-template-columns: 7.5rem 1fr auto;
+}
+
+.wall .bars-legend {
+  font-size: 0.92rem;
+}
+
+/* The whole-bill summary sits beside the hero figure. */
+.wall-summary {
+  margin: 0 0 2rem;
+}
+
+.wall-summary .bar-fill {
+  height: 34px;
 }

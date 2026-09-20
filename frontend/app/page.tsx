@@ -29,7 +29,7 @@ const STEP_LABELS: [Step, string][] = [
   ["results", "Comparison"],
   ["packet", "Packet"],
 ];
-// In screen mode the phone stops at "sent" — the comparison and packet live on
+// In screen mode the phone stops at "sent": the comparison and packet live on
 // the presentation screen, so promising them here would be a lie.
 const SCREEN_STEP_LABELS: [Step, string][] = [
   ["setup", "Your bill"],
@@ -85,7 +85,7 @@ export default function Home() {
 
   const [hospitals, setHospitals] = useState<Facility[]>([]);
   const [samples, setSamples] = useState<DemoSample[]>([]);
-  const [showSamples, setShowSamples] = useState(false);
+  const [pick, setPick] = useState<DemoSample | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [facility, setFacility] = useState<Facility | null>(null);
   const [priceHints, setPriceHints] = useState<PriceReference[]>([]);
@@ -136,7 +136,15 @@ export default function Home() {
 
   useEffect(() => {
     api.hospitals().then(setHospitals).catch(() => setHospitals([]));
-    api.demoSamples().then(setSamples).catch(() => setSamples([]));
+    api
+      .demoSamples()
+      .then((list) => {
+        setSamples(list);
+        // Whoever scans next gets a different bill than the last person, which
+        // keeps the wall varied without anyone choosing.
+        setPick(list.length ? list[Math.floor(Math.random() * list.length)] : null);
+      })
+      .catch(() => setSamples([]));
   }, []);
 
   useEffect(() => {
@@ -211,6 +219,12 @@ export default function Home() {
     setStep("results");
   };
 
+  const shuffle = () => {
+    if (samples.length < 2) return;
+    const others = samples.filter((s) => s.id !== pick?.id);
+    setPick(others[Math.floor(Math.random() * others.length)]);
+  };
+
   const startDemo = async (sample?: string) => {
     setError(null);
     setBusy("Loading the example bill…");
@@ -218,6 +232,10 @@ export default function Home() {
       const created = await api.demoCase(sample);
       const s = { caseId: created.case_id, token: created.access_token, isDemo: true };
       store(s);
+      if (screenMode) {
+        await runAnalysis(s);
+        return;
+      }
       const lines = await api.getBill(s.caseId, s.token);
       setSavedLines(lines);
       setBusy(null);
@@ -278,7 +296,7 @@ export default function Home() {
       setEditable(lines.length > 0 ? lines : [blankLine(careSetting)]);
       setExtractNotes(
         doc.needs_manual_entry
-          ? [...doc.warnings, "Type the lines from your itemized bill below — it only takes a moment."]
+          ? [...doc.warnings, "Type the lines from your itemized bill below. It only takes a moment."]
           : doc.warnings,
       );
       setBusy(null);
@@ -406,99 +424,72 @@ export default function Home() {
 
       {step === "start" && (
         <>
-          <h1>
-            {screenMode ? "Send a bill to the screen" : "What does this hospital actually charge?"}
-          </h1>
-          <p className="lede">
-            Hospitals must publish their prices. Compare a bill against those files and see the source for
-            every number.
-            {screenMode && " Your comparison appears on the screen in the room, not on this phone."}
-          </p>
-
-          <button
-            type="button"
-            className="primary choice"
-            onClick={() => void startDemo()}
-            disabled={Boolean(busy)}
-          >
-            <span className="title">{screenMode ? "Send the example bill" : "Try the example bill"}</span>
-            <span className="sub">A sample bill, a real local hospital. No typing.</span>
-          </button>
-
-          <button
-            type="button"
-            className="choice"
-            onClick={() => {
-              setError(null);
-              setStep("setup");
-            }}
-            disabled={Boolean(busy)}
-          >
-            <span className="title">{screenMode ? "Send my own bill" : "Check my own bill"}</span>
-            <span className="sub">Upload it, or type a few lines. About a minute.</span>
-          </button>
-
-          {/* The two ways in stay next to each other; the longer example list
-              opens underneath them rather than pushing one off the screen. */}
-          {samples.length > 1 && (
+          {pick ? (
             <>
+              <p className="eyebrow">Example bill</p>
+              <h1>{pick.title}</h1>
+              <p className="lede">{pick.blurb}</p>
+
               <button
                 type="button"
-                className="link expander"
-                aria-expanded={showSamples}
-                onClick={() => setShowSamples((v) => !v)}
+                className="primary choice"
+                onClick={() => void startDemo(pick.id)}
+                disabled={Boolean(busy)}
               >
-                {showSamples ? "Fewer examples" : `More examples (${samples.length - 1})`}
+                <span className="title">
+                  {screenMode ? "Send this to the screen" : "Compare this bill"}
+                </span>
               </button>
 
-              {showSamples && (
-                <div role="group" aria-label="Example bills">
-                  {samples.slice(1).map((sample) => (
-                    <button
-                      key={sample.id}
-                      type="button"
-                      className="choice"
-                      onClick={() => void startDemo(sample.id)}
-                      disabled={Boolean(busy)}
-                    >
-                      <span className="title">{sample.title}</span>
-                      <span className="sub">{sample.blurb}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="two-up">
+                <button type="button" onClick={shuffle} disabled={Boolean(busy) || samples.length < 2}>
+                  Show me another
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setStep("setup");
+                  }}
+                  disabled={Boolean(busy)}
+                >
+                  Use my own bill
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h1>{screenMode ? "Send a bill to the screen" : "Check a hospital bill"}</h1>
+              <button
+                type="button"
+                className="primary choice"
+                onClick={() => {
+                  setError(null);
+                  setStep("setup");
+                }}
+                disabled={Boolean(busy)}
+              >
+                <span className="title">Use my own bill</span>
+              </button>
             </>
           )}
 
-          {screenMode && (
-            <p className="note">
-              <strong>This is a shared screen.</strong> Whatever you send is shown to everyone in the
-              room: service codes, descriptions, and amounts. Names, dates of birth, account numbers,
-              phone numbers, and emails are stripped out before anything is displayed — but if you would
-              rather not show your own numbers, send the example bill instead.
-            </p>
-          )}
-
-          <div className="fineprint">
-            <p style={{ marginBottom: "0.5rem" }}>
-              This shows differences worth asking about — not proof that a charge is wrong, and not a
-              promise you will pay less.
-            </p>
-            <p style={{ marginBottom: "0.5rem" }}>
-              No name, date of birth, account number or member ID is ever asked for. Uploaded files are
-              read once for their line items, then dropped.
-            </p>
-            <p style={{ margin: 0 }}>{DISCLAIMER}</p>
-          </div>
+          <p className="fineprint">{DISCLAIMER}</p>
         </>
       )}
 
       {step === "setup" && (
         <>
           <h1>About this bill</h1>
-          <p className="muted">
-            Four quick questions. We never ask for your name, date of birth, or account number.
+          <p className="lede">
+            Four questions. No name, date of birth or account number.
           </p>
+          {screenMode && (
+            <p className="note">
+              <strong>Shared screen.</strong> Codes and amounts you enter appear on the screen in this
+              room. Names, dates of birth, account numbers, phones and emails never do.
+            </p>
+          )}
 
           <label htmlFor="hospital">Which hospital sent the bill?</label>
           <select id="hospital" value={hospitalId} onChange={(e) => setHospitalId(e.target.value)}>
@@ -507,7 +498,7 @@ export default function Home() {
               .filter((h) => h.facility_type === "hospital" || h.facility_type === "hospital_outpatient")
               .map((h) => (
                 <option key={h.id} value={h.id}>
-                  {h.name} — {h.city}, {h.state}
+                  {h.name}, {h.city} {h.state}
                 </option>
               ))}
           </select>
@@ -591,7 +582,7 @@ export default function Home() {
             />
             <p className="muted small">
               The file is read once to pull out the line items, then dropped. Up to {MAX_UPLOAD_MB} MB.
-              Photos of bills cannot be read automatically in this build — you will be asked to type those
+              Photos of bills cannot be read automatically in this build, so you will be asked to type those
               lines.
             </p>
           </div>

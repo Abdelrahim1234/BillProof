@@ -1,0 +1,64 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 829 >>
+stream
+BT
+/F1 11 Tf
+50 760 Td
+14 TL
+(SYNTHETIC DEMO BILL -- not a real patient statement) Tj
+T* (LewisGale Hospital Montgomery) Tj
+T* (Insurance: Cigna / NPR      ) Tj
+T* (Service date: 2026-09-03) Tj
+T* ( ) Tj
+T* (Line 1) Tj
+T* (Code: 71046 \(CPT\)) Tj
+T* (Description: Chest X-ray, 2 views) Tj
+T* (Setting: Outpatient) Tj
+T* (Units: 1) Tj
+T* (Billed amount: $450.00) Tj
+T* (Allowed amount: $450.00) Tj
+T* ( ) Tj
+T* (Line 2) Tj
+T* (Code: 80053 \(CPT\)) Tj
+T* (Description: Comprehensive metabolic panel) Tj
+T* (Setting: Outpatient) Tj
+T* (Units: 1) Tj
+T* (Billed amount: $210.00) Tj
+T* (Patient responsibility: $150.00) Tj
+T* ( ) Tj
+T* (Line 3) Tj
+T* (Code: 27447 \(CPT\)) Tj
+T* (Description: Total knee arthroplasty) Tj
+T* (Setting: Outpatient) Tj
+T* (Units: 1) Tj
+T* (Billed amount: $28500.00) Tj
+T* (Allowed amount: $22000.00) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1191
+%%EOF

@@ -26,7 +26,7 @@ boot and listens on the `PORT` the platform injects.
    - **Root Directory**: `backend`
    - **Builder**: Dockerfile (Railway detects `backend/Dockerfile` automatically)
    - **Health check path**: `/api/v1/health`
-3. **Variables** — none are required. Useful ones: `CASE_TTL_HOURS`, `LOG_LEVEL`,
+3. **Variables**, none are required. Useful ones: `CASE_TTL_HOURS`, `LOG_LEVEL`,
    `DEMO_MODE`. Do **not** set `PORT`; Railway injects it.
 4. **Settings → Networking → Generate Domain**. Copy the `https://…up.railway.app` URL.
 5. Check it: `curl https://your-api.up.railway.app/api/v1/ready` → `"seeded": true`.
@@ -36,7 +36,7 @@ Two things to know:
 - **Storage is ephemeral.** SQLite lives in the container, so cases and analyses
   disappear on redeploy or restart. Cases expire in 24h by design, so this is fine
   for a demo. For persistence, add a Railway Postgres and set
-  `DATABASE_URL=postgresql+psycopg://…` — the app supports it with no code change.
+  `DATABASE_URL=postgresql+psycopg://…`, the app supports it with no code change.
 - **Cost.** New accounts get a one-time $5 trial credit; after that Hobby is $5/month,
   and the post-trial free plan only grants $1/month of credit. Fly.io is an equivalent
   alternative and uses the same Dockerfile. Avoid Render's free tier: it sleeps, and a
@@ -68,7 +68,7 @@ with a clear message instead of failing at the edge. If real uploads fail, lower
 ## 3. DNS
 
 The project domain is `thebillbuster.health`, registered at **Porkbun**, with
-Porkbun's nameservers. Records go in Porkbun's panel — not GoDaddy's, which is not
+Porkbun's nameservers. Records go in Porkbun's panel, not GoDaddy's, which is not
 authoritative for this domain. (If you later move the domain to GoDaddy, the same
 records apply; GoDaddy's quirks are noted at the end.)
 
@@ -79,7 +79,7 @@ anywhere.
    `www.thebillbuster.health` and `thebillbuster.health`, and set **www as
    primary** so the bare domain redirects to it.
 2. Vercel shows the exact records. **The CNAME value is project-specific**,
-   something like `d1d4fc829fe7bc7c.vercel-dns-017.com` — copy it from your
+   something like `d1d4fc829fe7bc7c.vercel-dns-017.com`, copy it from your
    dashboard. Values from blog posts or older docs will not verify.
 3. In Porkbun: **Domain Management → thebillbuster.health → Details → DNS Records**.
 
@@ -93,7 +93,7 @@ anywhere.
    | Type | Host | Answer | TTL |
    |---|---|---|---|
    | `CNAME` | `www` | the value Vercel shows | 600 |
-   | `A` | *(leave blank — blank means the apex)* | `76.76.21.21` (confirm in Vercel) | 600 |
+   | `A` | *(leave blank, blank means the apex)* | `76.76.21.21` (confirm in Vercel) | 600 |
 
    Porkbun also supports `ALIAS` at the apex if you would rather not hard-code
    Vercel's IP; point it at the same hostname Vercel gives for the apex.
@@ -114,7 +114,7 @@ curl -sI https://www.thebillbuster.health   # 200, valid TLS
 - **Do not use URL forwarding** (Porkbun's forwarding, or GoDaddy's) to point at the
   Vercel URL. It redirects or frames rather than serving your domain, which breaks
   HTTPS and makes the QR code useless.
-- **On GoDaddy specifically**, the apex cannot be a CNAME — use the A record above.
+- **On GoDaddy specifically**, the apex cannot be a CNAME, use the A record above.
   Porkbun does not have this limitation because it offers ALIAS.
 - If you ever move nameservers, copy MX and TXT records first or you will silently
   lose email on the domain.
@@ -123,14 +123,14 @@ curl -sI https://www.thebillbuster.health   # 200, valid TLS
 
 Nothing to configure. `/present` uses the host the browser asked for, so opening
 `https://www.thebillbuster.health/present` produces a QR for
-`https://www.thebillbuster.health/?room=<ROOM_CODE>` — the send-only phone page that
+`https://www.thebillbuster.health/?room=<ROOM_CODE>`, the send-only phone page that
 feeds the screen.
 
 Because `ROOM_CODE` is fixed in your environment, that QR is stable: you can put it
 on a slide or a poster and it keeps working across restarts and redeploys.
 
-To force a specific target — say you want the QR to read `https://yourdomain.com`
-while you're on the Vercel URL — set `PUBLIC_URL` in Vercel, or open
+To force a specific target, say you want the QR to read `https://yourdomain.com`
+while you're on the Vercel URL, set `PUBLIC_URL` in Vercel, or open
 `/present?url=https://whatever` for a one-off.
 
 ## 5. Pre-demo checklist

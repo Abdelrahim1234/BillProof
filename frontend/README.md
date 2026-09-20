@@ -26,7 +26,7 @@ CORS configuration to get wrong.
 
 The `/present` page picks its QR target in this order:
 
-1. `?url=` on the page — `http://localhost:3000/present?url=https://abc.trycloudflare.com`
+1. `?url=` on the page, `http://localhost:3000/present?url=https://abc.trycloudflare.com`
 2. `PUBLIC_URL` in the environment
 3. This laptop's detected Wi-Fi address (used automatically when you open the
    page on localhost)
@@ -55,7 +55,7 @@ A tunnel also gives you HTTPS, which phone cameras and clipboard copy prefer.
 
 `/present` opens a room (`ROOM_CODE`), shows a QR pointing at `/?room=<code>`, and
 polls for the bill currently in that room. A phone that scans it runs the normal
-flow — pick the example bill or enter their own — and then **publishes** the
+flow, pick the example bill or enter their own, and then **publishes** the
 finished comparison to the room. The phone shows a confirmation, never a
 comparison; the analysis is displayed on the screen instead.
 
@@ -73,10 +73,10 @@ in a room full of people:
 
 The flow has two entry points:
 
-- **Try the example bill** — `POST /api/v1/demo/cases`. A synthetic bill against
+- **Try the example bill**, `POST /api/v1/demo/cases`. A synthetic bill against
   a real hospital's real published prices, labeled as synthetic everywhere,
   including in the packet. Works with no internet at all.
-- **Check my own bill** — pick a hospital and coverage, then upload a PDF or text
+- **Check my own bill**, pick a hospital and coverage, then upload a PDF or text
   bill or type the lines. Extraction returns editable candidates; nothing is
   compared until the person confirms them.
 
@@ -87,7 +87,7 @@ judge with no bill on their phone can still exercise the upload path.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `BACKEND_URL` | `http://127.0.0.1:8000` | Proxy target. **Baked in at build time** — redeploy after changing it |
+| `BACKEND_URL` | `http://127.0.0.1:8000` | Proxy target. **Baked in at build time**, redeploy after changing it |
 | `PUBLIC_URL` | unset | Forces the QR target (a tunnel or your domain) |
 | `NEXT_PUBLIC_MAX_UPLOAD_MB` | `4` | Browser-side upload guard, kept under the host's proxy body limit |
 | `ROOM_CODE` | `billproof` | The room the screen watches; also what the QR encodes |

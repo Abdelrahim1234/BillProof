@@ -2,7 +2,7 @@
 
 A phone runs the normal case flow, then *publishes* the finished analysis to a
 room code. The screen polls that room and renders it. What crosses over is a
-display copy of numbers the analysis already produced — never the case access
+display copy of numbers the analysis already produced, never the case access
 token, and never anything the analysis itself would not have returned.
 
 Invariant 9 still applies here, and more sharply: this content goes on a wall in

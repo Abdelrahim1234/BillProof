@@ -74,6 +74,6 @@ def latest_for_screen(room_code: str, db: Session = Depends(get_db)):
 
 @router.delete("/screens/{room_code}", status_code=204)
 def clear_screen(room_code: str, db: Session = Depends(get_db)):
-    """Clears the wall — useful between demo runs."""
+    """Clears the wall, useful between demo runs."""
     screens.clear(db, room_code)
     db.commit()

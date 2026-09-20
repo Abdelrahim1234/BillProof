@@ -1,9 +1,8 @@
 # Frontend UI review log
 
-Running notes from the 5-minute review loop. Changes here are local only —
-deploying stays a manual step.
+Running notes from the 5-minute review loop. Changes here are local only, deploying stays a manual step.
 
-## 2026-09-19 — Run 1: phone start screen + sample picker
+## 2026-09-19, Run 1: phone start screen + sample picker
 
 Changed:
 - Moved **Check my own bill** above the "More examples" disclosure. With nine

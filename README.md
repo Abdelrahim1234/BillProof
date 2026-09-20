@@ -1,4 +1,5 @@
-# BillProof 
+# BillBuster
+
 
 Turns a hospital bill into a citation-backed comparison against the hospital's own
 publicly disclosed prices, plus a negotiation packet.
